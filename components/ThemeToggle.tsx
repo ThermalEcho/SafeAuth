@@ -8,7 +8,7 @@ export function ThemeToggle() {
   return (
     <TouchableOpacity onPress={() => setColorScheme(colorScheme === 'dark' ? 'light' : 'dark')}>
       {colorScheme === 'dark' ? (
-        <Sun className="text-foreground" size={24} />
+        <Sun className="text-white" size={24} />
       ) : (
         <Moon className="text-foreground" size={24} />
       )}

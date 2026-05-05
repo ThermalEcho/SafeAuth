@@ -1,37 +1,33 @@
 // lib/auth-client.ts - Better Auth client configuration for React Native/Expo
-import { createAuthClient } from "better-auth/react";
+import { createAuthClient } from "better-auth/client";
 
 // Get base URL from environment or default
+// Handles all platforms: iOS, Android, Web
 const getBaseUrl = () => {
-  if (typeof window !== "undefined") {
-    return process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
+  // For Expo development
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
   }
-  return process.env.API_URL || "http://localhost:3000";
+
+  // Default for local development
+  if (__DEV__) {
+    // Use appropriate host for different platforms
+    // Android emulator: 10.0.2.2 routes to host
+    // iOS simulator: localhost or 127.0.0.1
+    // Web/Desktop: localhost
+    return "http://localhost:3000";
+  }
+
+  // Production
+  return process.env.EXPO_PUBLIC_API_URL || "https://api.safeauth.com";
 };
 
 export const authClient = createAuthClient({
   baseURL: getBaseUrl(),
+  fetchOptions: {
+    timeout: 1800000, // 30 minutes
+  },
 });
 
 // Export types for TypeScript
 export type AuthClient = typeof authClient;
-export type Session = any;
-export type User = any;
-
-// Helper function to check if user is authenticated
-export const isAuthenticated = (): boolean => {
-  const snapshot = (authClient as any).$getSnapshot?.();
-  return snapshot?.session !== null;
-};
-
-// Helper function to get current user
-export const getCurrentUser = (): User | null => {
-  const snapshot = (authClient as any).$getSnapshot?.();
-  return snapshot?.user || null;
-};
-
-// Helper function to get current session
-export const getCurrentSession = (): Session | null => {
-  const snapshot = (authClient as any).$getSnapshot?.();
-  return snapshot?.session || null;
-};
