@@ -5,8 +5,8 @@
   "main": "server.ts",
   "type": "module",
   "scripts": {
-    "start": "node server.ts",
-    "dev": "node --watch server.ts"
+    "start": "tsx server.ts",
+    "dev": "tsx watch server.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +20,7 @@
     "dotenv": "^16.0.0",
     "fastify": "^4.0.0",
     "postgres": "^3.0.0",
-    "resend": "^2.0.0"
+    "resend": "^2.0.0",
+    "tsx": "^4.21.0"
   }
 }
