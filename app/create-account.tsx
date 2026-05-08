@@ -186,7 +186,7 @@ export default function CreateAccountScreen() {
        } else if (error?.message?.includes('timeout') || error?.message?.includes('Timeout')) {
          message = 'Request timeout. Please check your internet connection and try again.';
        } else if (error?.message?.includes('Network')) {
-         message = 'Network error. Please check your internet connection and try again.';
+         message = 'Network error. Make sure the backend is running before signing up. Start it with npm run start:server, then retry.';
        } else if (error?.message) {
          message = error.message;
        }
