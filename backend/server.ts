@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { fileURLToPath } from "node:url";
 import { auth } from "./auth.ts";
+import { testConnection } from "./db.ts";
 
 // -----------------------------------------------------------------------------
 // Environment and runtime constants
@@ -159,10 +160,23 @@ fastify.route({
       const authResponse = await auth.handler(authRequest);
 
       console.log(`[Auth API] Response status: ${authResponse.status}`);
+      // Log response headers for diagnostics
+      try {
+        const headersObj: Record<string, string> = {};
+        authResponse.headers.forEach((value: string, key: string) => {
+          headersObj[key] = value;
+        });
+        console.log("[Auth API] Response headers:", headersObj);
+      } catch (e) {
+        console.log("[Auth API] Failed to read response headers", e);
+      }
+
+      const responseBody = await readResponseBody(authResponse);
+      console.log("[Auth API] Response body:", responseBody);
+
       reply.status(authResponse.status);
       applyResponseHeaders(authResponse, reply);
 
-      const responseBody = await readResponseBody(authResponse);
       return reply.send(responseBody);
     } catch (error: unknown) {
       return handleAuthRouteError(error, reply);
@@ -172,6 +186,17 @@ fastify.route({
 
 fastify.get(HEALTH_ROUTE, async (): Promise<{ status: string }> => {
   return { status: HEALTH_CHECK_STATUS };
+});
+
+// Debug: ping the database connection (helps diagnose remote 500s)
+fastify.get("/debug/db", async (_request, reply) => {
+  try {
+    await testConnection();
+    return reply.send({ ok: true, message: "Database connection successful" });
+  } catch (error: unknown) {
+    console.error("DB debug error:", error);
+    return reply.status(500).send({ ok: false, error: String(error) });
+  }
 });
 
 /**
