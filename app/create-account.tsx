@@ -1,199 +1,162 @@
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { Button, ButtonText } from '@/components/ui/button';
-import { authClient } from '@/lib/auth-client';
-import { router } from 'expo-router';
-import { Lock, Mail, User } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { Button, ButtonText } from "@/components/ui/button";
+import { authClient } from "@/lib/auth-client";
+import { showAlert, showAlertWithAction, validateEmail } from "@/lib/auth-utils";
+import { router } from "expo-router";
+import { Lock, Mail, User } from "lucide-react-native";
+import React, { useState } from "react";
 import {
-    Alert,
     Image,
     KeyboardAvoidingView,
     Platform,
     Text,
     TextInput,
-    View
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+    View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function CreateAccountScreen() {
+// -----------------------------------------------------------------------------
+// Screen constants
+// -----------------------------------------------------------------------------
+
+const MIN_PASSWORD_LENGTH = 8;
+const SIGN_UP_REQUEST_TIMEOUT_MS = 30000;
+const INPUT_PLACEHOLDER_COLOR = "#888";
+const TITLE = "Create Account";
+const SUBTITLE = "Secure your identity in seconds";
+const SIGN_UP_BUTTON_LABEL = "Create Account";
+const SIGN_UP_LOADING_LABEL = "Creating...";
+const NAVIGATE_TO_SIGN_IN_LABEL = "Sign In";
+const SIGN_UP_TIMEOUT_MESSAGE = "Request took too long. Check your connection.";
+const VALIDATION_ERROR_TITLE = "Validation Error";
+const SIGN_UP_ERROR_TITLE = "Sign Up Error";
+const SIGN_UP_SUCCESS_TITLE = "Account Created!";
+const GENERIC_SIGN_UP_ERROR_MESSAGE = "Failed to create account";
+const SIGN_IN_ROUTE = "/";
+const EMAIL_VERIFICATION_MESSAGE_SUFFIX = "Check your inbox to verify.";
+const ACCOUNT_CREATE_HINT = `Use at least ${MIN_PASSWORD_LENGTH} characters`;
+
+interface SignUpFormValues {
+  name: string;
+  email: string;
+  password: string;
+}
+
+/**
+ * Returns a readable error message for unknown thrown values.
+ *
+ * @param error - The thrown value from the sign-up flow.
+ * @returns A string that can be shown to the user in an alert.
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return GENERIC_SIGN_UP_ERROR_MESSAGE;
+}
+
+/**
+ * Validates the sign-up form and returns the first human-readable error.
+ *
+ * @param values - The current sign-up form values.
+ * @returns A validation message when the form is invalid, otherwise `null`.
+ */
+function validateSignUpForm(values: SignUpFormValues): string | null {
+  if (!values.name.trim()) {
+    return "Please enter your full name";
+  }
+
+  if (!values.email.trim()) {
+    return "Please enter your email address";
+  }
+
+  if (!validateEmail(values.email)) {
+    return "Please enter a valid email address";
+  }
+
+  if (!values.password) {
+    return "Please enter a password";
+  }
+
+  if (values.password.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+  }
+
+  return null;
+}
+
+/**
+ * Signs a user up with Better Auth.
+ *
+ * @param values - The sanitized form values.
+ * @returns The Better Auth error object or `null` when sign-up succeeds.
+ */
+async function submitSignUp(values: SignUpFormValues): Promise<{ message: string } | null> {
+  const { error } = await authClient.signUp.email({
+    name: values.name.trim(),
+    email: values.email.trim().toLowerCase(),
+    password: values.password,
+  });
+
+  return error ?? null;
+}
+
+/**
+ * Create-account screen for new users.
+ *
+ * @returns The rendered React Native sign-up screen.
+ */
+export default function CreateAccountScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
+  const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const validateForm = (): boolean => {
-    if (!name.trim()) {
-      Alert.alert('Missing Name', 'Please enter your full name');
-      return false;
+  /**
+   * Validates local form state and sends the sign-up request.
+   */
+  async function handleSignUp(): Promise<void> {
+    const validationMessage = validateSignUpForm({ name, email, password });
+
+    if (validationMessage !== null) {
+      showAlert(VALIDATION_ERROR_TITLE, validationMessage);
+      return;
     }
 
-    if (!email.trim()) {
-      Alert.alert('Missing Email', 'Please enter your email address');
-      return false;
+    setLoading(true);
+
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      showAlert("Timeout", SIGN_UP_TIMEOUT_MESSAGE);
+    }, SIGN_UP_REQUEST_TIMEOUT_MS);
+
+    try {
+      const authError = await submitSignUp({ name, email, password });
+
+      if (authError !== null) {
+        showAlert(SIGN_UP_ERROR_TITLE, authError.message);
+        return;
+      }
+
+      showAlertWithAction(
+        SIGN_UP_SUCCESS_TITLE,
+        `Verification email sent to ${email}. ${EMAIL_VERIFICATION_MESSAGE_SUFFIX}`,
+        () => {
+          setName("");
+          setEmail("");
+          setPassword("");
+          router.replace(SIGN_IN_ROUTE);
+        }
+      );
+    } catch (error: unknown) {
+      showAlert("Error", getErrorMessage(error));
+    } finally {
+      clearTimeout(timeoutId);
+      setLoading(false);
     }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
-      return false;
-    }
-
-    if (!password) {
-      Alert.alert('Missing Password', 'Please enter a password');
-      return false;
-    }
-
-    if (password.length < 8) {
-      Alert.alert('Weak Password', 'Password must be at least 8 characters');
-      return false;
-    }
-
-    return true;
-  };
-
-   const handleSignUp = async () => {
-     console.log('Form values:', { name, email, password });
-     console.log('Name trim check:', `"${name.trim()}"`, `length: ${name.trim().length}`);
-     
-     if (!validateForm()) {
-       return;
-     }
-
-     setLoading(true);
-     setStatusMessage('Creating account...');
-
-      // Safety timeout - ensure loading clears after 185 seconds even if request hangs
-      const safetyTimeout = setTimeout(() => {
-        setLoading(false);
-        setStatusMessage('');
-        Alert.alert(
-          'Timeout',
-          'Request took too long. Please check your internet connection and try again.'
-        );
-      }, 185000);
-
-     try {
-       // Attempt to create account
-       setStatusMessage('Creating account...');
-       
-       const requestData = {
-         name: name.trim(),
-         email: email.trim().toLowerCase(),
-         password,
-         callbackURL: '/',
-       };
-       console.log('Sending request data:', requestData);
-       
-       const { data, error } = await authClient.signUp.email(requestData, {
-         onRequest: (ctx) => {
-           setStatusMessage('Sending request...');
-         },
-         onSuccess: (ctx) => {
-           clearTimeout(safetyTimeout);
-           setLoading(false);
-           setStatusMessage('');
-           
-           // Account created - show verification message
-           Alert.alert(
-             'Account Created!',
-             `A verification email has been sent to ${email}. Please check your inbox and click the link to verify your account.`,
-             [
-               {
-                 text: 'OK',
-                 onPress: () => {
-                   // Clear form and return to sign in
-                   setName('');
-                   setEmail('');
-                   setPassword('');
-                   router.replace('/');
-                 },
-               },
-             ]
-           );
-         },
-         onError: (ctx) => {
-           clearTimeout(safetyTimeout);
-           setLoading(false);
-           setStatusMessage('');
-           
-           const errorMessage = ctx?.error?.message || 'Failed to create account';
-           console.error('Sign up error:', ctx?.error);
-           Alert.alert('Sign Up Error', errorMessage);
-         },
-       });
-
-       // Fallback: Handle direct return values
-       if (error) {
-         clearTimeout(safetyTimeout);
-         setLoading(false);
-         setStatusMessage('');
-         
-         let errorMessage = error.message || 'Failed to create account';
-         
-         // Handle specific error types
-         if (typeof error === 'object' && error.message) {
-           if (error.message.includes('email')) {
-             errorMessage = 'This email is already in use. Please try another.';
-           } else if (error.message.includes('network') || error.message.includes('Network')) {
-             errorMessage = 'Network error. Please check your connection and try again.';
-           }
-         }
-         
-         Alert.alert('Error', errorMessage);
-         return;
-       }
-
-       if (data) {
-         clearTimeout(safetyTimeout);
-         setLoading(false);
-         setStatusMessage('');
-         
-         Alert.alert(
-           'Account Created!',
-           `A verification email has been sent to ${email}. Please check your inbox and click the link to verify your account.`,
-           [
-             {
-               text: 'OK',
-               onPress: () => {
-                 // Clear form and return to sign in
-                 setName('');
-                 setEmail('');
-                 setPassword('');
-                 router.replace('/');
-               },
-             },
-           ]
-         );
-       }
-     } catch (error: any) {
-       clearTimeout(safetyTimeout);
-       setLoading(false);
-       setStatusMessage('');
-       
-       console.error('Sign up error:', error);
-       
-       // Determine error message based on error type
-       let message = 'Failed to create account';
-       
-       if (error.name === 'AbortError') {
-         message = 'Request was aborted. This often happens when switching screens too quickly. Please try again and stay on this screen until the process completes.';
-       } else if (error?.code === 'ECONNREFUSED' || error?.message?.includes('ECONNREFUSED')) {
-         message = 'Cannot reach the server. Make sure the backend is running and accessible at ' + 
-                   (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000');
-       } else if (error?.message?.includes('timeout') || error?.message?.includes('Timeout')) {
-         message = 'Request timeout. Please check your internet connection and try again.';
-       } else if (error?.message?.includes('Network')) {
-         message = 'Network error. Make sure the backend is running before signing up. Start it with npm run start:server, then retry.';
-       } else if (error?.message) {
-         message = error.message;
-       }
-       
-       Alert.alert('Error', message);
-     }
-   };
+  }
 
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-background-0">
@@ -202,50 +165,48 @@ export default function CreateAccountScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        <View className="flex-1 px-6 justify-center">
-          
-          <View className="items-center mb-10">
-            <View className="w-20 h-20 rounded-full bg-primary-500/10 items-center justify-center mb-3">
+        <View className="flex-1 justify-center px-6">
+          <View className="mb-10 items-center">
+            <View className="mb-3 h-20 w-20 items-center justify-center rounded-full bg-primary-500/10">
               <Image
-                source={require('@/assets/images/Logo.png')}
+                source={require("@/assets/images/Logo.png")}
                 style={{ width: 64, height: 64 }}
                 resizeMode="contain"
               />
             </View>
 
             <Text className="text-3xl font-bold text-typography-900">
-              Create Account
+              {TITLE}
             </Text>
 
-            <Text className="text-typography-500 mt-2 text-center">
-              Secure your identity in seconds
+            <Text className="mt-2 text-center text-typography-500">
+              {SUBTITLE}
             </Text>
           </View>
 
-          <View className="gap-4 w-full">
-
-            <View className="bg-background-50 border border-outline-200 rounded-xl px-4 py-3 flex-row items-center">
-              <User size={18} className="text-typography-500 mr-2" />
+          <View className="w-full gap-4">
+            <View className="flex-row items-center rounded-xl border border-outline-200 bg-background-50 px-4 py-3">
+              <User size={18} className="mr-2 text-typography-500" />
               <TextInput
                 value={name}
                 onChangeText={setName}
                 placeholder="Full name"
-                placeholderTextColor="#888"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 className="flex-1 text-typography-900"
                 editable={!loading}
               />
             </View>
 
-            <View className="bg-background-50 border border-outline-200 rounded-xl px-4 py-3 flex-row items-center">
-              <Mail size={18} className="text-typography-500 mr-2" />
+            <View className="flex-row items-center rounded-xl border border-outline-200 bg-background-50 px-4 py-3">
+              <Mail size={18} className="mr-2 text-typography-500" />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email address"
-                placeholderTextColor="#888"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 className="flex-1 text-typography-900"
@@ -253,58 +214,45 @@ export default function CreateAccountScreen() {
               />
             </View>
 
-            <View className="bg-background-50 border border-outline-200 rounded-xl px-4 py-3 flex-row items-center">
-              <Lock size={18} className="text-typography-500 mr-2" />
+            <View className="flex-row items-center rounded-xl border border-outline-200 bg-background-50 px-4 py-3">
+              <Lock size={18} className="mr-2 text-typography-500" />
               <TextInput
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Password"
-                placeholderTextColor="#888"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 secureTextEntry
                 className="flex-1 text-typography-900"
                 editable={!loading}
               />
             </View>
 
-            <Text className="text-xs text-typography-500 px-1">
-              Use at least 8 characters with a mix of letters and numbers
+            <Text className="px-1 text-xs text-typography-500">
+              {ACCOUNT_CREATE_HINT}
             </Text>
-
-            {statusMessage ? (
-              <Text className="text-sm text-primary-500 text-center py-2">
-                {statusMessage}
-              </Text>
-            ) : null}
 
             <Button
               variant="solid"
               size="lg"
               action="primary"
-              className="mt-4"
               isDisabled={loading}
               onPress={handleSignUp}
             >
-              <ButtonText>
-                {loading ? 'Creating...' : 'Create Account'}
-              </ButtonText>
+              <ButtonText>{loading ? SIGN_UP_LOADING_LABEL : SIGN_UP_BUTTON_LABEL}</ButtonText>
             </Button>
 
-            <View className="flex-row justify-center mt-6">
-              <Text className="text-typography-500">
-                Already have an account?{' '}
-              </Text>
-              <Text 
-                className="text-primary-500 font-semibold"
-                onPress={() => router.push('/')}
+            <View className="mt-6 flex-row justify-center">
+              <Text className="text-typography-500">Already have an account?{" "}</Text>
+              <Text
+                className="font-semibold text-primary-500"
+                onPress={() => router.push(SIGN_IN_ROUTE)}
               >
-                Sign In
+                {NAVIGATE_TO_SIGN_IN_LABEL}
               </Text>
             </View>
-
           </View>
         </View>
       </KeyboardAvoidingView>
     </View>
   );
-
 }

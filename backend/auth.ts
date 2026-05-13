@@ -4,84 +4,181 @@ import { admin } from "better-auth/plugins";
 import { Resend } from "resend";
 import { pool } from "./db.ts";
 
-// Initialize Resend email client
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// -----------------------------------------------------------------------------
+// Environment and domain constants
+// -----------------------------------------------------------------------------
 
-// Email sender - configure based on environment
-const emailFrom = process.env.EMAIL_FROM || "SafeAuth <onboarding@resend.dev>";
+const DEFAULT_AUTH_BASE_URL = "http://localhost:3000";
+const DEFAULT_EMAIL_FROM = "SafeAuth <onboarding@resend.dev>";
+const EMAIL_HASH_ROUNDS = 10;
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 128;
+const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7;
+const SESSION_REFRESH_SECONDS = 60 * 60 * 24;
+const EMAIL_VERIFICATION_DURATION_SECONDS = 24 * 60 * 60;
+const VERIFICATION_EMAIL_SUBJECT = "Verify your email for SafeAuth";
+const VERIFICATION_BUTTON_COLOR = "#007bff";
+const VERIFICATION_BUTTON_TEXT_COLOR = "white";
+const VERIFICATION_EMAIL_HTML_FONT = "Arial, sans-serif";
+
+interface PasswordHashInput {
+  password: string;
+}
+
+interface PasswordVerificationInput {
+  hash: string;
+  password: string;
+}
+
+interface VerificationEmailContext {
+  user: {
+    email: string;
+  };
+  url: string;
+}
+
+/**
+ * Returns a configured Resend client when an API key is available.
+ *
+ * @returns A Resend client or `null` when email delivery is disabled.
+ */
+function createResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    return null;
+  }
+
+  return new Resend(apiKey);
+}
+
+/**
+ * Hashes a plaintext password using the configured bcrypt work factor.
+ *
+ * @param input - The password payload from Better Auth.
+ * @returns A bcrypt hash for the supplied password.
+ */
+async function hashPassword(input: PasswordHashInput): Promise<string> {
+  return bcrypt.hash(input.password, EMAIL_HASH_ROUNDS);
+}
+
+/**
+ * Verifies a plaintext password against a stored bcrypt hash.
+ *
+ * @param input - The bcrypt hash and candidate password.
+ * @returns `true` when the password matches the hash; otherwise `false`.
+ */
+async function verifyPassword(input: PasswordVerificationInput): Promise<boolean> {
+  return bcrypt.compare(input.password, input.hash);
+}
+
+/**
+ * Builds the fallback HTML used for verification emails.
+ *
+ * @param verificationUrl - The link users must open to verify their account.
+ * @returns A self-contained HTML email template.
+ */
+function buildVerificationEmailHtml(verificationUrl: string): string {
+  return `
+    <div style="font-family: ${VERIFICATION_EMAIL_HTML_FONT}; max-width: 600px;">
+      <h2>Verify your email</h2>
+      <p>Welcome to SafeAuth! Click the link below to verify:</p>
+      <p>
+        <a
+          href="${verificationUrl}"
+          style="background: ${VERIFICATION_BUTTON_COLOR}; color: ${VERIFICATION_BUTTON_TEXT_COLOR}; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;"
+        >
+          Verify Email
+        </a>
+      </p>
+      <p>Link expires in 24 hours.</p>
+    </div>
+  `;
+}
+
+/**
+ * Logs the verification URL when Resend is not configured.
+ *
+ * @param emailAddress - The user's email address.
+ * @param verificationUrl - The verification link that would have been sent.
+ */
+function logFallbackVerificationUrl(emailAddress: string, verificationUrl: string): void {
+  console.log(`Verification URL for ${emailAddress}:`, verificationUrl);
+}
+
+/**
+ * Logs an error in a consistent shape for email delivery failures.
+ *
+ * @param error - The unknown error thrown by the email provider.
+ */
+function logEmailDeliveryError(error: unknown): void {
+  if (error instanceof Error) {
+    console.error("Email error:", error.message);
+    return;
+  }
+
+  console.error("Email error:", error);
+}
+
+const resendClient = createResendClient();
+const emailFromAddress = process.env.EMAIL_FROM ?? DEFAULT_EMAIL_FROM;
+
+/**
+ * Sends the verification email or logs the fallback URL when email delivery
+ * is not configured.
+ *
+ * @param context - The Better Auth verification payload.
+ */
+async function sendVerificationEmail(context: VerificationEmailContext): Promise<void> {
+  const { user, url } = context;
+
+  try {
+    if (resendClient === null) {
+      logFallbackVerificationUrl(user.email, url);
+      return;
+    }
+
+    await resendClient.emails.send({
+      from: emailFromAddress,
+      to: user.email,
+      subject: VERIFICATION_EMAIL_SUBJECT,
+      html: buildVerificationEmailHtml(url),
+    });
+
+    console.log("Verification email sent to:", user.email);
+  } catch (error: unknown) {
+    logEmailDeliveryError(error);
+    console.log("Fallback URL:", url);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Better Auth configuration
+// -----------------------------------------------------------------------------
 
 export const auth = betterAuth({
   database: pool,
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000", // Set base URL for Better Auth
+  baseURL: process.env.BETTER_AUTH_URL ?? DEFAULT_AUTH_BASE_URL,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
     password: {
-      minLength: 8,
-      maxLength: 128,
-      requireUppercase: false,
-      requireNumbers: false,
-      requireSpecialChar: false,
-      hash: async (password: string) => {
-        const saltRounds = 10;
-        return await bcrypt.hash(password, saltRounds);
-      },
-      verify: async ({ hash, password }) => {
-        return await bcrypt.compare(password, hash);
-      },
+      minLength: PASSWORD_MIN_LENGTH,
+      maxLength: PASSWORD_MAX_LENGTH,
+      hash: hashPassword,
+      verify: verifyPassword,
     },
   },
   session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // 24 hours
+    expiresIn: SESSION_DURATION_SECONDS,
+    updateAge: SESSION_REFRESH_SECONDS,
     cache: false,
   },
   emailVerification: {
     sendOnSignUp: true,
     autoSignInAfterVerification: false,
-    expiresIn: 24 * 60 * 60, // 24 hours
-    sendVerificationEmail: async ({ user, url, token }) => {
-      try {
-        if (!resend) {
-          console.warn("RESEND_API_KEY not configured. Email verification link:");
-          console.log(`Email: ${user.email}`);
-          console.log(`Verification URL: ${url}`);
-          return;
-        }
-
-        const { data, error } = await resend.emails.send({
-          from: emailFrom,
-          to: user.email,
-          subject: "Verify your email address for SafeAuth",
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2>Verify your email address</h2>
-              <p>Welcome to SafeAuth! Please verify your email address by clicking the link below:</p>
-              <p style="margin: 24px 0;">
-                <a href="${url}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                  Verify Email
-                </a>
-              </p>
-              <p>Or copy and paste this link in your browser:</p>
-              <p style="word-break: break-all; color: #666;">${url}</p>
-              <p style="margin-top: 24px; font-size: 12px; color: #999;">
-                This link will expire in 24 hours.
-              </p>
-            </div>
-          `,
-        });
-
-        if (error) {
-          console.error("Resend email error:", error);
-          console.log("Verification URL fallback for", user.email, ":", url);
-        } else {
-          console.log("Verification email sent to:", user.email, "| Message ID:", data?.id);
-        }
-      } catch (error) {
-        console.error("Verification email failed:", error);
-        console.log("Verification URL fallback for", user.email, ":", url);
-      }
-    },
+    expiresIn: EMAIL_VERIFICATION_DURATION_SECONDS,
+    sendVerificationEmail,
   },
   plugins: [admin()],
 });

@@ -1,46 +1,67 @@
-// db.ts - Database connection pool for Better Auth
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
-import pkg from 'pg';
+import { Pool, type PoolClient } from "pg";
 
-dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
+// -----------------------------------------------------------------------------
+// Environment configuration
+// -----------------------------------------------------------------------------
 
-const { Pool } = pkg;
+const ENV_FILE_PATH = fileURLToPath(new URL("../.env", import.meta.url));
+const DATABASE_ENV_KEYS = [
+  "SUPABASE_POOLER_URL",
+  "DATABASE_POOLER_URL",
+  "DATABASE_URL",
+] as const;
+const DATABASE_SSL_OPTIONS = { rejectUnauthorized: false } as const;
+const DATABASE_CONNECTION_REQUIRED_MESSAGE = "DATABASE_URL is required";
+const DATABASE_PING_QUERY = "SELECT 1";
 
-const connectionString =
-  process.env.SUPABASE_POOLER_URL ||
-  process.env.DATABASE_POOLER_URL ||
-  process.env.DATABASE_URL;
+dotenv.config({ path: ENV_FILE_PATH });
 
-if (!connectionString) {
-  throw new Error('DATABASE_URL is required for the Better Auth PostgreSQL connection.');
-}
+/**
+ * Resolves the first available database connection string from the supported
+ * environment variables.
+ *
+ * @returns The database connection string used by the shared connection pool.
+ * @throws {Error} When none of the supported environment variables are set.
+ */
+function resolveConnectionString(): string {
+  for (const environmentKey of DATABASE_ENV_KEYS) {
+    const value = process.env[environmentKey];
 
-if (!process.env.SUPABASE_POOLER_URL && !process.env.DATABASE_POOLER_URL) {
-  const databaseUrl = new URL(connectionString);
-  if (databaseUrl.hostname.endsWith('.supabase.co')) {
-    console.warn(
-      'Supabase direct host detected. If the backend cannot reach it from this network, set SUPABASE_POOLER_URL or DATABASE_POOLER_URL to your Supabase pooler connection string.'
-    );
+    if (value) {
+      return value;
+    }
   }
+
+  throw new Error(DATABASE_CONNECTION_REQUIRED_MESSAGE);
 }
+
+// -----------------------------------------------------------------------------
+// Shared pool
+// -----------------------------------------------------------------------------
 
 export const pool = new Pool({
-  connectionString,
-  ssl: {
-    rejectUnauthorized: false, // required for Supabase
-  },
+  connectionString: resolveConnectionString(),
+  ssl: DATABASE_SSL_OPTIONS,
 });
 
-// Test database connection
-export const testConnection = async () => {
+// -----------------------------------------------------------------------------
+// Diagnostics
+// -----------------------------------------------------------------------------
+
+/**
+ * Verifies that the shared PostgreSQL pool can execute a simple query.
+ *
+ * @returns A promise that resolves when the connection check succeeds.
+ */
+export async function testConnection(): Promise<void> {
+  const client: PoolClient = await pool.connect();
+
   try {
-    const client = await pool.connect();
-    console.log('✅ Database connected successfully');
+    await client.query(DATABASE_PING_QUERY);
+    console.log("Database connection successful");
+  } finally {
     client.release();
-    return true;
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    return false;
   }
-};
+}

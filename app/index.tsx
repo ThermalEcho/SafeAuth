@@ -1,115 +1,172 @@
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming
-} from 'react-native-reanimated';
-import { authClient } from '@/lib/auth-client';
-import { Button, ButtonText } from '@/components/ui/button';
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { Button, ButtonText } from "@/components/ui/button";
+import { authClient } from "@/lib/auth-client";
+import { showAlert, showAlertWithAction } from "@/lib/auth-utils";
+import { router } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    ActivityIndicator,
+    Image,
+    Animated as RNAnimated,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const ROTATING_WORDS = ['secure', 'private', 'encrypted', 'protected', 'safe'];
+// -----------------------------------------------------------------------------
+// Screen constants
+// -----------------------------------------------------------------------------
 
-export default function LandingScreen() {
-  const insets = useSafeAreaInsets();
-  const [wordIndex, setWordIndex] = useState(0);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const opacity = useSharedValue(1);
+const ROTATING_SECURITY_WORDS = ["secure", "private", "encrypted", "protected", "safe"] as const;
+const WORD_ROTATION_INTERVAL_MS = 3000;
+const WORD_FADE_DURATION_MS = 500;
+const SIGN_IN_REQUEST_TIMEOUT_MS = 30000;
+const INPUT_PLACEHOLDER_COLOR = "#888";
+const LOADING_INDICATOR_COLOR = "#fff";
+const APP_NAME = "SafeAuth";
+const APP_TAGLINE = "Secure Authentication";
+const SIGN_IN_TITLE = "Sign In";
+const CREATE_ACCOUNT_TITLE = "Create Account";
+const EMPTY_CREDENTIALS_ERROR = "Please enter email and password";
+const SIGN_IN_TIMEOUT_MESSAGE = "Request took too long. Check your connection.";
+const SIGN_IN_ERROR_TITLE = "Sign In Error";
+const SIGN_IN_SUCCESS_TITLE = "Success";
+const SIGN_IN_SUCCESS_MESSAGE = "Signed in successfully!";
+const GENERIC_SIGN_IN_ERROR_MESSAGE = "Failed to sign in";
+const SIGN_IN_SUCCESS_ROUTE = "/(tabs)/home";
+const CREATE_ACCOUNT_ROUTE = "/create-account";
+
+interface SignInCredentials {
+  email: string;
+  password: string;
+}
+
+interface RotatingWordState {
+  currentWord: string;
+  opacity: RNAnimated.Value;
+}
+
+/**
+ * Returns a user-friendly message for unknown thrown values.
+ *
+ * @param error - The thrown value from the sign-in flow.
+ * @returns A readable error message that can be shown in an alert.
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return GENERIC_SIGN_IN_ERROR_MESSAGE;
+}
+
+/**
+ * Manages the animated rotating word displayed on the sign-in screen.
+ *
+ * @param words - The words that should cycle through the hero message.
+ * @param intervalMs - The time between word changes.
+ * @param fadeDurationMs - The fade out and fade in duration for each change.
+ * @returns The current word and its animated opacity value.
+ */
+function useRotatingSecurityWord(
+  words: readonly string[],
+  intervalMs: number,
+  fadeDurationMs: number
+): RotatingWordState {
+  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
+  const opacity = useRef<RNAnimated.Value>(new RNAnimated.Value(1)).current;
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      opacity.value = withTiming(0, { duration: 500, easing: Easing.inOut(Easing.ease) });
-      
-      setTimeout(() => {
-        setWordIndex((prev) => (prev + 1) % ROTATING_WORDS.length);
-        opacity.value = withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) });
-      }, 500);
-    }, 3000);
+    const rotationTimer = setInterval(() => {
+      RNAnimated.timing(opacity, {
+        toValue: 0,
+        duration: fadeDurationMs,
+        useNativeDriver: true,
+      }).start(() => {
+        setCurrentWordIndex((currentIndex: number) => (currentIndex + 1) % words.length);
 
-    return () => clearInterval(interval);
-  }, []);
+        RNAnimated.timing(opacity, {
+          toValue: 1,
+          duration: fadeDurationMs,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, intervalMs);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
+    return () => clearInterval(rotationTimer);
+  }, [fadeDurationMs, intervalMs, opacity, words]);
 
-  const handleSignIn = async () => {
-      if (!email || !password) {
-        Alert.alert('Error', 'Please enter both email and password');
+  return {
+    currentWord: words[currentWordIndex],
+    opacity,
+  };
+}
+
+/**
+ * Performs the sign-in request and returns the Better Auth error, if any.
+ *
+ * @param credentials - The user's email and password.
+ * @returns The Better Auth error object or `null` when sign-in succeeds.
+ */
+async function submitSignIn(credentials: SignInCredentials): Promise<{ message: string } | null> {
+  const { error } = await authClient.signIn.email(credentials);
+  return error ?? null;
+}
+
+/**
+ * Sign-in screen for existing users.
+ *
+ * The component keeps the original UX but splits the async work and animation
+ * setup into smaller helpers so the behavior is easier to follow.
+ *
+ * @returns The rendered React Native sign-in screen.
+ */
+export default function SignInScreen(): React.JSX.Element {
+  const insets = useSafeAreaInsets();
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const { currentWord, opacity } = useRotatingSecurityWord(
+    ROTATING_SECURITY_WORDS,
+    WORD_ROTATION_INTERVAL_MS,
+    WORD_FADE_DURATION_MS
+  );
+
+  /**
+   * Validates the local form state and sends the sign-in request.
+   */
+  async function handleSignIn(): Promise<void> {
+    if (!email || !password) {
+      showAlert("Error", EMPTY_CREDENTIALS_ERROR);
+      return;
+    }
+
+    setLoading(true);
+
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      showAlert("Timeout", SIGN_IN_TIMEOUT_MESSAGE);
+    }, SIGN_IN_REQUEST_TIMEOUT_MS);
+
+    try {
+      const authError = await submitSignIn({ email, password });
+
+      if (authError !== null) {
+        showAlert(SIGN_IN_ERROR_TITLE, authError.message);
         return;
       }
 
-      setLoading(true);
-
-      // Safety timeout - ensure loading clears after 30 seconds even if request hangs
-      const safetyTimeout = setTimeout(() => {
-        setLoading(false);
-        Alert.alert('Timeout', 'Request took too long. Please check your internet connection and try again.');
-      }, 30000);
-
-      try {
-        const { data, error } = await authClient.signIn.email({
-          email,
-          password,
-        }, {
-          onRequest: (ctx) => {
-            // Show loading state
-            setLoading(true);
-          },
-          onSuccess: (ctx) => {
-            // Sign in successful
-            clearTimeout(safetyTimeout);
-            setLoading(false);
-            Alert.alert('Success', 'Signed in successfully!', [
-              {
-                text: 'OK',
-                onPress: () => {
-                  router.replace('/(tabs)/home');
-                },
-              },
-            ]);
-          },
-          onError: (ctx) => {
-            clearTimeout(safetyTimeout);
-            setLoading(false);
-            // Handle sign in error
-            Alert.alert('Sign In Error', ctx.error.message || 'Failed to sign in');
-          },
-        });
-
-        // Handle direct return values as fallback
-        if (error) {
-          clearTimeout(safetyTimeout);
-          setLoading(false);
-          Alert.alert('Sign In Error', error.message);
-          return;
-        }
-
-        if (data) {
-          clearTimeout(safetyTimeout);
-          setLoading(false);
-          Alert.alert('Success', 'Signed in successfully!', [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace('/(tabs)/home');
-              },
-            },
-          ]);
-        }
-      } catch (error: any) {
-        clearTimeout(safetyTimeout);
-        setLoading(false);
-        console.error('Sign in error:', error);
-        Alert.alert('Error', error.message || 'Failed to sign in. Make sure the backend server is running.');
-      }
-    };
+      showAlertWithAction(SIGN_IN_SUCCESS_TITLE, SIGN_IN_SUCCESS_MESSAGE, () => {
+        router.replace(SIGN_IN_SUCCESS_ROUTE);
+      });
+    } catch (error: unknown) {
+      showAlert("Error", getErrorMessage(error));
+    } finally {
+      clearTimeout(timeoutId);
+      setLoading(false);
+    }
+  }
 
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-background-0">
@@ -117,51 +174,53 @@ export default function LandingScreen() {
         <ThemeToggle />
       </View>
 
-      <View className="flex-1 px-6 justify-center items-center">
+      <View className="flex-1 items-center justify-center px-6">
         <View className="mb-8 items-center">
-          <View className="w-24 h-24 rounded-full bg-primary-500/10 items-center justify-center mb-4">
+          <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-primary-500/10">
             <Image
-              source={require('@/assets/images/Logo.png')}
+              source={require("@/assets/images/Logo.png")}
               style={{ width: 72, height: 72 }}
               resizeMode="contain"
             />
           </View>
-          <Text className="text-4xl font-bold text-typography-900 tracking-tight">
-            SafeAuth
+          <Text className="text-4xl font-bold tracking-tight text-typography-900">
+            {APP_NAME}
           </Text>
-          <Text className="text-typography-500 text-sm mt-1">
-            Secure Authentication
+          <Text className="mt-1 text-sm text-typography-500">
+            {APP_TAGLINE}
           </Text>
         </View>
 
-        <View className="h-12 items-center justify-center mb-8">
-          <Animated.Text style={animatedStyle} className="text-2xl text-typography-600 font-medium text-center">
-            Your data is {ROTATING_WORDS[wordIndex]}
-          </Animated.Text>
+        <View className="mb-8 h-12 items-center justify-center">
+          <RNAnimated.View style={{ opacity }}>
+            <Text className="text-2xl font-medium text-typography-600">
+              Your data is {currentWord}
+            </Text>
+          </RNAnimated.View>
         </View>
 
-        <View className="w-full gap-4 mb-8">
-          <View className="bg-background-50 border border-outline-200 rounded-xl px-4 py-3 flex-row items-center">
+        <View className="mb-8 w-full gap-4">
+          <View className="rounded-xl border border-outline-200 bg-background-50 px-4 py-3">
             <TextInput
               value={email}
               onChangeText={setEmail}
               placeholder="Email address"
-              placeholderTextColor="#888"
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               keyboardType="email-address"
               autoCapitalize="none"
-              className="flex-1 text-typography-900"
+              className="text-typography-900"
               editable={!loading}
             />
           </View>
 
-          <View className="bg-background-50 border border-outline-200 rounded-xl px-4 py-3 flex-row items-center">
+          <View className="rounded-xl border border-outline-200 bg-background-50 px-4 py-3">
             <TextInput
               value={password}
               onChangeText={setPassword}
               placeholder="Password"
-              placeholderTextColor="#888"
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               secureTextEntry
-              className="flex-1 text-typography-900"
+              className="text-typography-900"
               editable={!loading}
             />
           </View>
@@ -172,14 +231,13 @@ export default function LandingScreen() {
             variant="solid"
             size="lg"
             action="primary"
-            className="mt-4"
             isDisabled={loading}
             onPress={handleSignIn}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={LOADING_INDICATOR_COLOR} />
             ) : (
-              <ButtonText>Sign In</ButtonText>
+              <ButtonText>{SIGN_IN_TITLE}</ButtonText>
             )}
           </Button>
 
@@ -187,10 +245,9 @@ export default function LandingScreen() {
             variant="outline"
             size="lg"
             action="primary"
-            className="mt-2"
-            onPress={() => router.push('/create-account')}
+            onPress={() => router.push(CREATE_ACCOUNT_ROUTE)}
           >
-            <ButtonText>Create Account</ButtonText>
+            <ButtonText>{CREATE_ACCOUNT_TITLE}</ButtonText>
           </Button>
         </View>
       </View>
