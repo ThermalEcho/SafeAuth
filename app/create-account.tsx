@@ -93,13 +93,37 @@ function validateSignUpForm(values: SignUpFormValues): string | null {
  * @returns The Better Auth error object or `null` when sign-up succeeds.
  */
 async function submitSignUp(values: SignUpFormValues): Promise<{ message: string } | null> {
-  const { error } = await authClient.signUp.email({
-    name: values.name.trim(),
-    email: values.email.trim().toLowerCase(),
-    password: values.password,
-  });
+  try {
+    console.log("[SignUp] Starting sign-up...");
+    console.log("[SignUp] Form values:", { name: values.name, email: values.email });
+    
+    const response = await authClient.signUp.email({
+      name: values.name.trim(),
+      email: values.email.trim().toLowerCase(),
+      password: values.password,
+    });
 
-  return error ?? null;
+    console.log("[SignUp] Response object:", response);
+    
+    if (response.error) {
+      console.error("[SignUp] Auth error:", response.error);
+      return response.error;
+    } else {
+      console.log("[SignUp] Sign-up successful:", response.data);
+      return null;
+    }
+  } catch (err: unknown) {
+    console.error("[SignUp] Network/request error:", err);
+    if (err instanceof Error) {
+      console.error("[SignUp] Error details:", {
+        name: err.name,
+        message: err.message,
+        cause: (err as any).cause,
+      });
+      console.error("[SignUp] Stack:", err.stack);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -151,7 +175,23 @@ export default function CreateAccountScreen(): React.JSX.Element {
         }
       );
     } catch (error: unknown) {
-      showAlert("Error", getErrorMessage(error));
+      const errorMessage = getErrorMessage(error);
+      console.error("[SignUp Handler] Caught error:", errorMessage);
+      
+      // Show more helpful error message for network issues
+      if (errorMessage.includes("Aborted") || errorMessage.toLowerCase().includes("network")) {
+        showAlert(
+          "Connection Failed",
+          "Cannot reach the backend server.\n\nPlease ensure:\n1. Backend is running (npm run dev)\n2. Check internet connection\n3. Verify EXPO_PUBLIC_API_URL in .env"
+        );
+      } else if (errorMessage.includes("timeout")) {
+        showAlert(
+          "Request Timeout",
+          "The server took too long to respond. Try again or restart the backend server."
+        );
+      } else {
+        showAlert("Error", errorMessage);
+      }
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);

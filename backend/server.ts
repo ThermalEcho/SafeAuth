@@ -131,10 +131,19 @@ const fastify = Fastify({
   logger: DEVELOPMENT_LOGGER_ENABLED,
 });
 
+// Register CORS before routes
 fastify.register(cors, {
   origin: true,
   methods: [...CORS_METHODS],
   credentials: true,
+});
+
+// Log all incoming requests
+fastify.addHook('onRequest', async (request, reply) => {
+  console.log(`[Server] ${request.method} ${request.url} - Headers:`, {
+    'content-type': request.headers['content-type'],
+    'content-length': request.headers['content-length'],
+  });
 });
 
 fastify.route({
@@ -142,9 +151,14 @@ fastify.route({
   url: AUTH_ROUTE_PATTERN,
   async handler(request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> {
     try {
+      console.log(`[Auth API] ${request.method} ${request.url}`);
+      console.log(`[Auth API] Request body:`, request.body);
+      console.log(`[Auth API] Request headers:`, request.headers);
+      
       const authRequest = createAuthRequest(request);
       const authResponse = await auth.handler(authRequest);
 
+      console.log(`[Auth API] Response status: ${authResponse.status}`);
       reply.status(authResponse.status);
       applyResponseHeaders(authResponse, reply);
 
