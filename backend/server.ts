@@ -188,6 +188,11 @@ fastify.get(HEALTH_ROUTE, async (): Promise<{ status: string }> => {
   return { status: HEALTH_CHECK_STATUS };
 });
 
+// Root route for Render and browsers
+fastify.get("/", async (): Promise<{ status: string; message: string }> => {
+  return { status: HEALTH_CHECK_STATUS, message: "SafeAuth backend running" };
+});
+
 // Debug: ping the database connection (helps diagnose remote 500s)
 fastify.get("/debug/db", async (_request, reply) => {
   try {
