@@ -30,6 +30,9 @@ interface PasswordVerificationInput {
   password: string;
 }
 
+type PasswordHashValue = string | PasswordHashInput;
+type PasswordVerificationValue = string | PasswordVerificationInput;
+
 interface VerificationEmailContext {
   user: {
     email: string;
@@ -58,8 +61,10 @@ function createResendClient(): Resend | null {
  * @param input - The password payload from Better Auth.
  * @returns A bcrypt hash for the supplied password.
  */
-async function hashPassword(input: PasswordHashInput): Promise<string> {
-  return bcrypt.hash(input.password, EMAIL_HASH_ROUNDS);
+async function hashPassword(input: PasswordHashValue): Promise<string> {
+  const password = typeof input === "string" ? input : input.password;
+
+  return bcrypt.hash(password, EMAIL_HASH_ROUNDS);
 }
 
 /**
@@ -68,7 +73,11 @@ async function hashPassword(input: PasswordHashInput): Promise<string> {
  * @param input - The bcrypt hash and candidate password.
  * @returns `true` when the password matches the hash; otherwise `false`.
  */
-async function verifyPassword(input: PasswordVerificationInput): Promise<boolean> {
+async function verifyPassword(input: PasswordVerificationValue): Promise<boolean> {
+  if (typeof input === "string") {
+    throw new Error("Password verification requires both a hash and password");
+  }
+
   return bcrypt.compare(input.password, input.hash);
 }
 

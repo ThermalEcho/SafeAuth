@@ -57,10 +57,16 @@ export const authClient = createAuthClient({
   // that don't work in native environments
   disableDefaultFetchPlugins: true,
   fetchOptions: {
-    timeout: 30000,
+    timeout: 60000,
     // Log fetch requests for debugging
     onRequest: async (request) => {
-      console.log("[Auth Fetch] →", request.method, request.url);
+      try {
+        const bodyPreview = request?.body ? String(request.body).slice(0, 200) : undefined;
+        console.log("[Auth Fetch] →", request.method, request.url, bodyPreview ? `body=${bodyPreview}` : "");
+      } catch (e) {
+        console.log("[Auth Fetch] →", request.method, request.url);
+      }
+
       return request;
     },
     onResponse: async (response) => {

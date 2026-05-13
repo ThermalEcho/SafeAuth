@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 // -----------------------------------------------------------------------------
 
 const MIN_PASSWORD_LENGTH = 8;
-const SIGN_UP_REQUEST_TIMEOUT_MS = 30000;
+const SIGN_UP_REQUEST_TIMEOUT_MS = 60000;
 const INPUT_PLACEHOLDER_COLOR = "#888";
 const TITLE = "Create Account";
 const SUBTITLE = "Secure your identity in seconds";
