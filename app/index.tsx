@@ -1,256 +1,141 @@
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Box } from "@/components/ui/box";
 import { Button, ButtonText } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
-import { showAlert, showAlertWithAction } from "@/lib/auth-utils";
+import { Center } from "@/components/ui/center";
+import { Heading } from "@/components/ui/heading";
+import { HStack } from "@/components/ui/hstack";
+import { SafeAreaView } from "@/components/ui/safe-area-view";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
-import {
-    ActivityIndicator,
-    Image,
-    Animated as RNAnimated,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ArrowRight, Fingerprint, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react-native";
+import React from "react";
+import { StatusBar } from "react-native";
 
-// -----------------------------------------------------------------------------
-// Screen constants
-// -----------------------------------------------------------------------------
-
-const ROTATING_SECURITY_WORDS = ["secure", "private", "encrypted", "protected", "safe"] as const;
-const WORD_ROTATION_INTERVAL_MS = 3000;
-const WORD_FADE_DURATION_MS = 500;
-const SIGN_IN_REQUEST_TIMEOUT_MS = 30000;
-const INPUT_PLACEHOLDER_COLOR = "#888";
-const LOADING_INDICATOR_COLOR = "#fff";
 const APP_NAME = "SafeAuth";
-const APP_TAGLINE = "Secure Authentication";
-const SIGN_IN_TITLE = "Sign In";
-const CREATE_ACCOUNT_TITLE = "Create Account";
-const EMPTY_CREDENTIALS_ERROR = "Please enter email and password";
-const SIGN_IN_TIMEOUT_MESSAGE = "Request took too long. Check your connection.";
-const SIGN_IN_ERROR_TITLE = "Sign In Error";
-const SIGN_IN_SUCCESS_TITLE = "Success";
-const SIGN_IN_SUCCESS_MESSAGE = "Signed in successfully!";
-const GENERIC_SIGN_IN_ERROR_MESSAGE = "Failed to sign in";
-const SIGN_IN_SUCCESS_ROUTE = "/(tabs)/home";
-const CREATE_ACCOUNT_ROUTE = "/create-account";
+const LOGIN_ROUTE = "/sign-in";
+const SIGNUP_ROUTE = "/create-account";
 
-interface SignInCredentials {
-  email: string;
-  password: string;
-}
-
-interface RotatingWordState {
-  currentWord: string;
-  opacity: RNAnimated.Value;
-}
-
-/**
- * Returns a user-friendly message for unknown thrown values.
- *
- * @param error - The thrown value from the sign-in flow.
- * @returns A readable error message that can be shown in an alert.
- */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return GENERIC_SIGN_IN_ERROR_MESSAGE;
-}
-
-/**
- * Manages the animated rotating word displayed on the sign-in screen.
- *
- * @param words - The words that should cycle through the hero message.
- * @param intervalMs - The time between word changes.
- * @param fadeDurationMs - The fade out and fade in duration for each change.
- * @returns The current word and its animated opacity value.
- */
-function useRotatingSecurityWord(
-  words: readonly string[],
-  intervalMs: number,
-  fadeDurationMs: number
-): RotatingWordState {
-  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
-  const opacity = useRef<RNAnimated.Value>(new RNAnimated.Value(1)).current;
-
-  useEffect(() => {
-    const rotationTimer = setInterval(() => {
-      RNAnimated.timing(opacity, {
-        toValue: 0,
-        duration: fadeDurationMs,
-        useNativeDriver: true,
-      }).start(() => {
-        setCurrentWordIndex((currentIndex: number) => (currentIndex + 1) % words.length);
-
-        RNAnimated.timing(opacity, {
-          toValue: 1,
-          duration: fadeDurationMs,
-          useNativeDriver: true,
-        }).start();
-      });
-    }, intervalMs);
-
-    return () => clearInterval(rotationTimer);
-  }, [fadeDurationMs, intervalMs, opacity, words]);
-
-  return {
-    currentWord: words[currentWordIndex],
-    opacity,
-  };
-}
-
-/**
- * Performs the sign-in request and returns the Better Auth error, if any.
- *
- * @param credentials - The user's email and password.
- * @returns The Better Auth error object or `null` when sign-in succeeds.
- */
-async function submitSignIn(credentials: SignInCredentials): Promise<{ message: string } | null> {
-  const { error } = await authClient.signIn.email(credentials);
-  return error ?? null;
-}
-
-/**
- * Sign-in screen for existing users.
- *
- * The component keeps the original UX but splits the async work and animation
- * setup into smaller helpers so the behavior is easier to follow.
- *
- * @returns The rendered React Native sign-in screen.
- */
-export default function SignInScreen(): React.JSX.Element {
-  const insets = useSafeAreaInsets();
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const { currentWord, opacity } = useRotatingSecurityWord(
-    ROTATING_SECURITY_WORDS,
-    WORD_ROTATION_INTERVAL_MS,
-    WORD_FADE_DURATION_MS
-  );
-
-  /**
-   * Validates the local form state and sends the sign-in request.
-   */
-  async function handleSignIn(): Promise<void> {
-    if (!email || !password) {
-      showAlert("Error", EMPTY_CREDENTIALS_ERROR);
-      return;
-    }
-
-    setLoading(true);
-
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      showAlert("Timeout", SIGN_IN_TIMEOUT_MESSAGE);
-    }, SIGN_IN_REQUEST_TIMEOUT_MS);
-
-    try {
-      const authError = await submitSignIn({ email, password });
-
-      if (authError !== null) {
-        showAlert(SIGN_IN_ERROR_TITLE, authError.message);
-        return;
-      }
-
-      showAlertWithAction(SIGN_IN_SUCCESS_TITLE, SIGN_IN_SUCCESS_MESSAGE, () => {
-        router.replace(SIGN_IN_SUCCESS_ROUTE);
-      });
-    } catch (error: unknown) {
-      showAlert("Error", getErrorMessage(error));
-    } finally {
-      clearTimeout(timeoutId);
-      setLoading(false);
-    }
-  }
-
+function StatCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}): React.JSX.Element {
   return (
-    <View style={{ paddingTop: insets.top }} className="flex-1 bg-background-0">
-      <View className="flex-row justify-end px-6 py-4">
-        <ThemeToggle />
-      </View>
+    <Box className="flex-1 rounded-[24px] border border-outline-200 bg-background-0/90 p-4">
+      <Box className="h-11 w-11 items-center justify-center rounded-2xl bg-primary-500/10">
+        {icon}
+      </Box>
 
-      <View className="flex-1 items-center justify-center px-6">
-        <View className="mb-8 items-center">
-          <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-primary-500/10">
-            <Image
-              source={require("@/assets/images/Logo.png")}
-              style={{ width: 72, height: 72 }}
-              resizeMode="contain"
-            />
-          </View>
-          <Text className="text-4xl font-bold tracking-tight text-typography-900">
-            {APP_NAME}
-          </Text>
-          <Text className="mt-1 text-sm text-typography-500">
-            {APP_TAGLINE}
-          </Text>
-        </View>
+      <Text className="mt-4 text-base font-semibold text-typography-900">
+        {title}
+      </Text>
 
-        <View className="mb-8 h-12 items-center justify-center">
-          <RNAnimated.View style={{ opacity }}>
-            <Text className="text-2xl font-medium text-typography-600">
-              Your data is {currentWord}
+      <Text className="mt-1 text-sm leading-5 text-typography-500">
+        {description}
+      </Text>
+    </Box>
+  );
+}
+
+export default function LandingScreen(): React.JSX.Element {
+  return (
+    <SafeAreaView className="flex-1 bg-[#F5F7FB]" edges={["top", "bottom"]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F5F7FB" />
+
+      <Box className="absolute -left-24 top-[-60px] h-72 w-72 rounded-full bg-primary-500/10" />
+      <Box className="absolute -right-24 bottom-[-100px] h-96 w-96 rounded-full bg-secondary-400/20" />
+
+      <Box className="flex-1 px-6">
+        <HStack className="items-center justify-between pt-4">
+          <HStack className="items-center rounded-full border border-outline-200 bg-background-0/95 px-3 py-2">
+            <Box className="h-8 w-8 items-center justify-center rounded-full bg-primary-500">
+              <ShieldCheck size={16} color="#ffffff" />
+            </Box>
+
+            <Text className="ml-2 text-sm font-semibold text-typography-900">
+              {APP_NAME}
             </Text>
-          </RNAnimated.View>
-        </View>
+          </HStack>
 
-        <View className="mb-8 w-full gap-4">
-          <View className="rounded-xl border border-outline-200 bg-background-50 px-4 py-3">
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email address"
-              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              className="text-typography-900"
-              editable={!loading}
-            />
-          </View>
+          <ThemeToggle />
+        </HStack>
 
-          <View className="rounded-xl border border-outline-200 bg-background-50 px-4 py-3">
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-              secureTextEntry
-              className="text-typography-900"
-              editable={!loading}
-            />
-          </View>
-        </View>
+        <Center className="flex-1">
+          <VStack space="xl" className="w-full max-w-md">
+            <Box className="items-center">
+              <Box className="h-28 w-28 items-center justify-center rounded-[32px] bg-primary-500 shadow-sm">
+                <Fingerprint size={54} color="#ffffff" />
+              </Box>
 
-        <View className="w-full gap-4">
-          <Button
-            variant="solid"
-            size="lg"
-            action="primary"
-            isDisabled={loading}
-            onPress={handleSignIn}
-          >
-            {loading ? (
-              <ActivityIndicator color={LOADING_INDICATOR_COLOR} />
-            ) : (
-              <ButtonText>{SIGN_IN_TITLE}</ButtonText>
-            )}
-          </Button>
+              <HStack className="mt-5 items-center rounded-full border border-primary-200 bg-primary-50 px-4 py-2">
+                <Sparkles size={14} color="#2563eb" />
+                <Text className="ml-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary-700">
+                  Android-ready auth
+                </Text>
+              </HStack>
+            </Box>
 
-          <Button
-            variant="outline"
-            size="lg"
-            action="primary"
-            onPress={() => router.push(CREATE_ACCOUNT_ROUTE)}
-          >
-            <ButtonText>{CREATE_ACCOUNT_TITLE}</ButtonText>
-          </Button>
-        </View>
-      </View>
-    </View>
+            <VStack space="md" className="items-center px-2">
+              <Heading size="2xl" className="text-center text-typography-900">
+                Secure sign-in without the web app feel
+              </Heading>
+
+              <Text className="text-center text-base leading-7 text-typography-500">
+                A focused mobile interface for account creation and login that keeps the keyboard,
+                safe areas, and action buttons stable on Android.
+              </Text>
+            </VStack>
+
+            <HStack className="gap-3">
+              <StatCard
+                icon={<LockKeyhole size={20} color="#2563eb" />}
+                title="Protected"
+                description="Trimmed flows with validation and backend feedback."
+              />
+              <StatCard
+                icon={<ShieldCheck size={20} color="#2563eb" />}
+                title="Native"
+                description="Scroll-safe layouts and keyboard-aware forms."
+              />
+            </HStack>
+
+            <Box className="rounded-[28px] border border-outline-200 bg-background-0/95 p-5 shadow-sm">
+              <VStack space="md">
+                <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-typography-400">
+                  Start here
+                </Text>
+
+                <Button
+                  size="xl"
+                  action="primary"
+                  className="h-14 rounded-[20px]"
+                  onPress={() => router.push(SIGNUP_ROUTE)}
+                >
+                  <HStack className="items-center">
+                    <ButtonText>Create account</ButtonText>
+                    <ArrowRight size={18} color="#ffffff" />
+                  </HStack>
+                </Button>
+
+                <Button
+                  size="xl"
+                  variant="outline"
+                  action="primary"
+                  className="h-14 rounded-[20px] border-outline-300 bg-background-0"
+                  onPress={() => router.push(LOGIN_ROUTE)}
+                >
+                  <ButtonText>Sign in</ButtonText>
+                </Button>
+              </VStack>
+            </Box>
+          </VStack>
+        </Center>
+      </Box>
+    </SafeAreaView>
   );
 }

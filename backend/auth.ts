@@ -168,6 +168,23 @@ async function sendVerificationEmail(context: VerificationEmailContext): Promise
 export const auth = betterAuth({
   database: pool,
   baseURL: process.env.BETTER_AUTH_URL ?? DEFAULT_AUTH_BASE_URL,
+  advanced: {
+    database: {
+      generateId: "serial",
+    },
+  },
+  schema: {
+    user: {
+      additionalFields: {
+        password: {
+          type: "string",
+          input: true,
+          returned: false,
+          required: false,
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

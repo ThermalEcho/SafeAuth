@@ -7,6 +7,7 @@ const LOCAL_API_URLS = new Set([
   "http://127.0.0.1:3000",
   "http://10.0.2.2:3000",
 ]);
+const FALLBACK_PRODUCTION_API_URL = "https://safeauth-backend.onrender.com";
 
 const getConfiguredApiUrl = (): string | undefined => {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -41,10 +42,10 @@ const getBaseUrl = (): string => {
     return devUrl;
   }
 
-  const errorMsg =
-    "EXPO_PUBLIC_API_URL is required in production. Set it to your Render backend URL, such as https://safeauth-backend.onrender.com.";
-  console.error("[Auth] Configuration error:", errorMsg);
-  throw new Error(errorMsg);
+  console.warn(
+    "[Auth] EXPO_PUBLIC_API_URL is not set. Falling back to the Render backend URL for startup so the UI can load."
+  );
+  return FALLBACK_PRODUCTION_API_URL;
 };
 
 const baseUrl = getBaseUrl();
@@ -69,8 +70,12 @@ export const authClient = createAuthClient({
 
       return request;
     },
-    onResponse: async (response) => {
-      console.log("[Auth Fetch] ←", response.status, response.statusText, response.url);
+    onResponse: async (response: any) => {
+      try {
+        console.log("[Auth Fetch] ←", response.status, response.statusText, response.url);
+      } catch (e) {
+        console.log("[Auth Fetch] ← response (uninspectable):", response);
+      }
       return response;
     },
     onError: async (error) => {

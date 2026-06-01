@@ -83,7 +83,7 @@ async function testConnection() {
   } catch (error) {
     console.log(`   ❌ Error: ${error.message}`);
     console.log(`   💡 Tips:`);
-    console.log(`      1. Make sure the backend is running: npm run start:server`);
+    console.log(`      1. Make sure the backend is running: pnpm start:server`);
     console.log(`      2. Check the backend logs for errors`);
     console.log(`      3. Verify EXPO_PUBLIC_API_URL is correct in .env`);
     console.log(`      4. Check CORS settings in backend/server.ts`);

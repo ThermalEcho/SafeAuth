@@ -1,11 +1,10 @@
 // lib/use-auth.ts - Authentication hook for React Native
 import { useEffect, useState } from 'react';
 import { authClient } from './auth-client';
-import type { Session, User } from './auth-client';
 
 export const useAuth = () => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<any | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

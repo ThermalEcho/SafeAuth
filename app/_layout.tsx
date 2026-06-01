@@ -1,16 +1,19 @@
-import 'react-native-get-random-values';
-import { Stack } from "expo-router";
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import '@/global.css';
+import { Stack } from "expo-router";
+import 'react-native-get-random-values';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
   return (
-    <GluestackUIProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
-    </GluestackUIProvider>
+    <SafeAreaProvider>
+      <GluestackUIProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        />
+      </GluestackUIProvider>
+    </SafeAreaProvider>
   );
 }

@@ -10,7 +10,7 @@ import { testConnection } from "./db.ts";
 // Environment and runtime constants
 // -----------------------------------------------------------------------------
 
-const ENV_FILE_PATH = fileURLToPath(new URL("../.env", import.meta.url));
+const ENV_FILE_PATH = fileURLToPath(String(new URL("../.env", import.meta.url)));
 const DEVELOPMENT_LOGGER_ENABLED = process.env.NODE_ENV === "development";
 const DEFAULT_SERVER_PORT = 3000;
 const DEFAULT_SERVER_HOST = "localhost";
@@ -100,7 +100,7 @@ function createAuthRequest(request: FastifyRequest): Request {
   return new Request(requestUrl.toString(), {
     method: request.method,
     headers: requestHeaders,
-    ...(requestBody === undefined ? {} : { body: requestBody }),
+    ...(requestBody === undefined ? {} : { body: requestBody as unknown as BodyInit }),
   });
 }
 
@@ -133,7 +133,8 @@ const fastify = Fastify({
 });
 
 // Register CORS before routes
-fastify.register(cors, {
+// Fastify's plugin types can be incompatible across versions; cast to `any`.
+fastify.register(cors as any, {
   origin: true,
   methods: [...CORS_METHODS],
   credentials: true,
@@ -169,6 +170,25 @@ fastify.route({
         console.log("[Auth API] Response headers:", headersObj);
       } catch (e) {
         console.log("[Auth API] Failed to read response headers", e);
+      }
+
+      // Diagnostic: when Better Auth returns a server error, attempt to
+      // clone and log the raw body (and parsed JSON when possible) so we
+      // can see the underlying error details instead of a null payload.
+      if (authResponse.status >= 500) {
+        try {
+          const diagnosticClone = authResponse.clone();
+          const raw = await diagnosticClone.text();
+          console.error("[Auth API] Better Auth error body (raw):", raw);
+          try {
+            const parsed = JSON.parse(raw);
+            console.error("[Auth API] Better Auth error body (json):", parsed);
+          } catch (_) {
+            // ignore JSON parse errors
+          }
+        } catch (e) {
+          console.error("[Auth API] Failed to read error body:", e);
+        }
       }
 
       const responseBody = await readResponseBody(authResponse);

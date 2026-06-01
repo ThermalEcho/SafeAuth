@@ -7,7 +7,7 @@ echo ""
 # Start backend server in background
 echo "▶️ Starting Better Auth backend server..."
 cd /Users/Quant/Documents/GitHub/SafeAuth
-npm run start:server &
+pnpm start:server &
 SERVER_PID=$!
 
 # Wait for server to start
@@ -26,7 +26,7 @@ fi
 # Start Expo app
 echo "▶️ Starting Expo app..."
 echo ""
-npm start
+pnpm start
 
 # Cleanup on exit
 trap "kill $SERVER_PID 2>/dev/null" EXIT

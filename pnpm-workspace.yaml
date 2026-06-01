@@ -1,0 +1,12 @@
+packages:
+  - .
+  - backend
+allowBuilds:
+  bcrypt: true
+  dtrace-provider: true
+  esbuild: true
+  unrs-resolver: true
+onlyBuiltDependencies:
+  - bcrypt
+  - esbuild
+  - unrs-resolver

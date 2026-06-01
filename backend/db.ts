@@ -6,7 +6,7 @@ import { Pool, type PoolClient } from "pg";
 // Environment configuration
 // -----------------------------------------------------------------------------
 
-const ENV_FILE_PATH = fileURLToPath(new URL("../.env", import.meta.url));
+const ENV_FILE_PATH = fileURLToPath(String(new URL("../.env", import.meta.url)));
 const DATABASE_ENV_KEYS = [
   "SUPABASE_POOLER_URL",
   "DATABASE_POOLER_URL",
