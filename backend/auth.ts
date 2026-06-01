@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { betterAuth } from "better-auth";
-import { admin } from "better-auth/plugins";
+import { admin, bearer } from "better-auth/plugins";
 import { Resend } from "resend";
 import { pool } from "./db.ts";
 
@@ -21,21 +21,9 @@ const VERIFICATION_BUTTON_COLOR = "#007bff";
 const VERIFICATION_BUTTON_TEXT_COLOR = "white";
 const VERIFICATION_EMAIL_HTML_FONT = "Arial, sans-serif";
 
-interface PasswordHashInput {
-  password: string;
-}
-
-interface PasswordVerificationInput {
-  hash: string;
-  password: string;
-}
-
-type PasswordHashValue = string | PasswordHashInput;
-type PasswordVerificationValue = string | PasswordVerificationInput;
-
 interface VerificationEmailContext {
   user: {
-    email: string;
+    email?: string;
   };
   url: string;
 }
@@ -61,9 +49,7 @@ function createResendClient(): Resend | null {
  * @param input - The password payload from Better Auth.
  * @returns A bcrypt hash for the supplied password.
  */
-async function hashPassword(input: PasswordHashValue): Promise<string> {
-  const password = typeof input === "string" ? input : input.password;
-
+async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, EMAIL_HASH_ROUNDS);
 }
 
@@ -73,11 +59,7 @@ async function hashPassword(input: PasswordHashValue): Promise<string> {
  * @param input - The bcrypt hash and candidate password.
  * @returns `true` when the password matches the hash; otherwise `false`.
  */
-async function verifyPassword(input: PasswordVerificationValue): Promise<boolean> {
-  if (typeof input === "string") {
-    throw new Error("Password verification requires both a hash and password");
-  }
-
+async function verifyPassword(input: { hash: string; password: string }): Promise<boolean> {
   return bcrypt.compare(input.password, input.hash);
 }
 
@@ -140,21 +122,27 @@ const emailFromAddress = process.env.EMAIL_FROM ?? DEFAULT_EMAIL_FROM;
  */
 async function sendVerificationEmail(context: VerificationEmailContext): Promise<void> {
   const { user, url } = context;
+  const email = user.email;
+
+  if (!email) {
+    console.error("Verification email skipped: user email is missing");
+    return;
+  }
 
   try {
     if (resendClient === null) {
-      logFallbackVerificationUrl(user.email, url);
+      logFallbackVerificationUrl(email, url);
       return;
     }
 
     await resendClient.emails.send({
       from: emailFromAddress,
-      to: user.email,
+      to: email,
       subject: VERIFICATION_EMAIL_SUBJECT,
       html: buildVerificationEmailHtml(url),
     });
 
-    console.log("Verification email sent to:", user.email);
+    console.log("Verification email sent to:", email);
   } catch (error: unknown) {
     logEmailDeliveryError(error);
     console.log("Fallback URL:", url);
@@ -188,9 +176,9 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    minPasswordLength: PASSWORD_MIN_LENGTH,
+    maxPasswordLength: PASSWORD_MAX_LENGTH,
     password: {
-      minLength: PASSWORD_MIN_LENGTH,
-      maxLength: PASSWORD_MAX_LENGTH,
       hash: hashPassword,
       verify: verifyPassword,
     },
@@ -198,7 +186,6 @@ export const auth = betterAuth({
   session: {
     expiresIn: SESSION_DURATION_SECONDS,
     updateAge: SESSION_REFRESH_SECONDS,
-    cache: false,
   },
   emailVerification: {
     sendOnSignUp: true,
@@ -206,5 +193,5 @@ export const auth = betterAuth({
     expiresIn: EMAIL_VERIFICATION_DURATION_SECONDS,
     sendVerificationEmail,
   },
-  plugins: [admin()],
+  plugins: [admin(), bearer()],
 });

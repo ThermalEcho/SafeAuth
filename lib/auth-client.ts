@@ -1,4 +1,3 @@
-// lib/auth-client.ts - Better Auth client configuration for React Native/Expo
 import { createAuthClient } from "better-auth/client";
 import { Platform } from "react-native";
 
@@ -8,13 +7,12 @@ const LOCAL_API_URLS = new Set([
   "http://10.0.2.2:3000",
 ]);
 const FALLBACK_PRODUCTION_API_URL = "https://safeauth-backend.onrender.com";
+let bearerToken = "";
 
 const getConfiguredApiUrl = (): string | undefined => {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
   const renderUrl = process.env.EXPO_PUBLIC_RENDER_API_URL?.trim();
-  
-  console.log("[Auth] Env vars - EXPO_PUBLIC_API_URL:", apiUrl, "EXPO_PUBLIC_RENDER_API_URL:", renderUrl);
-  
+
   return apiUrl || renderUrl || undefined;
 };
 
@@ -23,67 +21,64 @@ const isLocalApiUrl = (url: string): boolean => {
 };
 
 // Resolve the API base URL for local development or Render deployment.
-const getBaseUrl = (): string => {
+export const getAuthBaseUrl = (): string => {
   const configuredUrl = getConfiguredApiUrl();
 
   if (configuredUrl) {
     if (Platform.OS === "android" && isLocalApiUrl(configuredUrl)) {
-      console.log("[Auth] Using Android emulator localhost: http://10.0.2.2:3000");
       return "http://10.0.2.2:3000";
     }
 
-    console.log("[Auth] Using configured API URL:", configuredUrl);
     return configuredUrl;
   }
 
   if (__DEV__) {
-    const devUrl = Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
-    console.log("[Auth] Using development URL:", devUrl);
-    return devUrl;
+    return Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
   }
 
-  console.warn(
-    "[Auth] EXPO_PUBLIC_API_URL is not set. Falling back to the Render backend URL for startup so the UI can load."
-  );
   return FALLBACK_PRODUCTION_API_URL;
 };
 
-const baseUrl = getBaseUrl();
-console.log("[Auth] Final baseURL:", baseUrl);
-console.log("[Auth] Platform:", Platform.OS);
-
 export const authClient = createAuthClient({
-  baseURL: baseUrl,
-  // CRITICAL for React Native/Expo: disable default browser-specific fetch plugins
-  // that don't work in native environments
+  baseURL: getAuthBaseUrl(),
   disableDefaultFetchPlugins: true,
   fetchOptions: {
+    auth: {
+      token: () => bearerToken,
+      type: "Bearer",
+    },
     timeout: 60000,
-    // Log fetch requests for debugging
-    onRequest: async (request) => {
-      try {
-        const bodyPreview = request?.body ? String(request.body).slice(0, 200) : undefined;
-        console.log("[Auth Fetch] →", request.method, request.url, bodyPreview ? `body=${bodyPreview}` : "");
-      } catch (e) {
-        console.log("[Auth Fetch] →", request.method, request.url);
-      }
-
-      return request;
-    },
-    onResponse: async (response: any) => {
-      try {
-        console.log("[Auth Fetch] ←", response.status, response.statusText, response.url);
-      } catch (e) {
-        console.log("[Auth Fetch] ← response (uninspectable):", response);
-      }
-      return response;
-    },
-    onError: async (error) => {
-      console.error("[Auth Fetch] ✗ Error:", error instanceof Error ? error.message : error);
-      throw error;
-    },
   },
 });
 
-// Export types for TypeScript
+const authStateListeners = new Set<() => void>();
+
+export function subscribeAuthState(listener: () => void): () => void {
+  authStateListeners.add(listener);
+
+  return () => {
+    authStateListeners.delete(listener);
+  };
+}
+
+export function notifyAuthStateChanged(): void {
+  for (const listener of authStateListeners) {
+    listener();
+  }
+}
+
+export function setBearerToken(token: string | null | undefined): void {
+  bearerToken = token ?? "";
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  if (!bearerToken) {
+    return {};
+  }
+
+  return {
+    Authorization: `Bearer ${bearerToken}`,
+  };
+}
+
 export type AuthClient = typeof authClient;

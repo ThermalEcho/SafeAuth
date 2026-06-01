@@ -5,6 +5,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { fileURLToPath } from "node:url";
 import { auth } from "./auth.ts";
 import { testConnection } from "./db.ts";
+import { registerOtpRoutes } from "./otp.ts";
 
 // -----------------------------------------------------------------------------
 // Environment and runtime constants
@@ -223,6 +224,8 @@ fastify.get("/debug/db", async (_request, reply) => {
     return reply.status(500).send({ ok: false, error: String(error) });
   }
 });
+
+registerOtpRoutes(fastify);
 
 /**
  * Starts the HTTP server using the configured host and port.

@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "SafeAuth uses the camera to scan authenticator QR codes."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,6 +31,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SafeAuth to scan authenticator QR codes."
+        }
+      ],
       [
         "expo-splash-screen",
         {
