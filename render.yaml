@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: safeauth-backend
+    runtime: node
+    plan: free
+    buildCommand: pnpm install --filter safeauth-backend --prod --frozen-lockfile
+    startCommand: pnpm --filter safeauth-backend start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

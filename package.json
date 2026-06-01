@@ -7,10 +7,11 @@
     "node": "^22.0.0"
   },
   "scripts": {
-    "start": "pnpm exec expo start --clear",
+    "start": "pnpm --filter safeauth-backend start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "expo:start": "pnpm exec expo start --clear",
     "lint": "expo lint",
     "dev": "tsx watch backend/server.ts",
     "start:server": "tsx backend/server.ts",
