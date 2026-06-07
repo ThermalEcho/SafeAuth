@@ -1,15 +1,17 @@
 import bcrypt from "bcrypt";
 import { betterAuth } from "better-auth";
 import { admin, bearer } from "better-auth/plugins";
-import { Resend } from "resend";
+import dotenv from "dotenv";
+import { BrevoClient } from "@getbrevo/brevo";
+import { fileURLToPath } from "node:url";
 import { pool } from "./db.ts";
 
 // -----------------------------------------------------------------------------
 // Environment and domain constants
 // -----------------------------------------------------------------------------
 
+const ENV_FILE_PATH = fileURLToPath(String(new URL("../.env", import.meta.url)));
 const DEFAULT_AUTH_BASE_URL = "http://localhost:3000";
-const DEFAULT_EMAIL_FROM = "SafeAuth <onboarding@resend.dev>";
 const EMAIL_HASH_ROUNDS = 10;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
@@ -21,6 +23,8 @@ const VERIFICATION_BUTTON_COLOR = "#007bff";
 const VERIFICATION_BUTTON_TEXT_COLOR = "white";
 const VERIFICATION_EMAIL_HTML_FONT = "Arial, sans-serif";
 
+dotenv.config({ path: ENV_FILE_PATH });
+
 interface VerificationEmailContext {
   user: {
     email?: string;
@@ -28,19 +32,45 @@ interface VerificationEmailContext {
   url: string;
 }
 
+interface EmailSender {
+  email: string;
+  name: string;
+}
+
 /**
- * Returns a configured Resend client when an API key is available.
+ * Returns a configured Brevo client when an API key is available.
  *
- * @returns A Resend client or `null` when email delivery is disabled.
+ * @returns A Brevo client or `null` when email delivery is disabled.
  */
-function createResendClient(): Resend | null {
-  const apiKey = process.env.RESEND_API_KEY;
+function createBrevoClient(): BrevoClient | null {
+  const apiKey = process.env.BREVO_API_KEY;
 
   if (!apiKey) {
     return null;
   }
 
-  return new Resend(apiKey);
+  return new BrevoClient({ apiKey });
+}
+
+/**
+ * Converts "Name <address@example.com>" into Brevo's sender shape.
+ *
+ * @param value - The configured sender identity.
+ * @returns The parsed sender name and email address.
+ */
+function parseEmailSender(value: string | undefined): EmailSender {
+  const match = value?.trim().match(/^(.+?)\s*<([^<>\s]+@[^<>\s]+)>$/);
+
+  if (!match) {
+    throw new Error(
+      "EMAIL_FROM must use the format \"SafeAuth <your-verified-sender@example.com>\"",
+    );
+  }
+
+  return {
+    name: match[1].trim(),
+    email: match[2].trim(),
+  };
 }
 
 /**
@@ -88,7 +118,7 @@ function buildVerificationEmailHtml(verificationUrl: string): string {
 }
 
 /**
- * Logs the verification URL when Resend is not configured.
+ * Logs the verification URL when Brevo is not configured.
  *
  * @param emailAddress - The user's email address.
  * @param verificationUrl - The verification link that would have been sent.
@@ -111,8 +141,7 @@ function logEmailDeliveryError(error: unknown): void {
   console.error("Email error:", error);
 }
 
-const resendClient = createResendClient();
-const emailFromAddress = process.env.EMAIL_FROM ?? DEFAULT_EMAIL_FROM;
+const brevoClient = createBrevoClient();
 
 /**
  * Sends the verification email or logs the fallback URL when email delivery
@@ -130,22 +159,27 @@ async function sendVerificationEmail(context: VerificationEmailContext): Promise
   }
 
   try {
-    if (resendClient === null) {
+    if (brevoClient === null) {
       logFallbackVerificationUrl(email, url);
       return;
     }
 
-    await resendClient.emails.send({
-      from: emailFromAddress,
-      to: email,
+    const sender = parseEmailSender(process.env.EMAIL_FROM);
+    const response = await brevoClient.transactionalEmails.sendTransacEmail({
+      sender,
+      to: [{ email }],
       subject: VERIFICATION_EMAIL_SUBJECT,
-      html: buildVerificationEmailHtml(url),
+      htmlContent: buildVerificationEmailHtml(url),
+      textContent: `Verify your SafeAuth email by opening this link: ${url}`,
     });
 
-    console.log("Verification email sent to:", email);
+    console.log("Verification email sent:", {
+      id: response.messageId,
+      recipient: email,
+    });
   } catch (error: unknown) {
     logEmailDeliveryError(error);
-    console.log("Fallback URL:", url);
+    throw error;
   }
 }
 
