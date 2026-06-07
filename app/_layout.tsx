@@ -56,6 +56,7 @@ export default function RootLayout() {
         </Stack.Protected>
         <Stack.Protected guard={isLoggedIn}>
           <Stack.Screen name="home" />
+          <Stack.Screen name="camera" />
           <Stack.Screen name="otp" />
         </Stack.Protected>
       </Stack>

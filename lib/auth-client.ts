@@ -39,13 +39,18 @@ export const getAuthBaseUrl = (): string => {
   return FALLBACK_PRODUCTION_API_URL;
 };
 
+const authBaseUrl = getAuthBaseUrl();
+
 export const authClient = createAuthClient({
-  baseURL: getAuthBaseUrl(),
+  baseURL: authBaseUrl,
   disableDefaultFetchPlugins: true,
   fetchOptions: {
     auth: {
       token: () => bearerToken,
       type: "Bearer",
+    },
+    headers: Platform.OS === "web" ? undefined : {
+      Origin: new URL(authBaseUrl).origin,
     },
     timeout: 60000,
   },

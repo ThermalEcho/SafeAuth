@@ -5,6 +5,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { fileURLToPath } from "node:url";
 import { auth } from "./auth.ts";
 import { testConnection } from "./db.ts";
+import { ensureOtpSchema } from "./otp-schema.ts";
 import { registerOtpRoutes } from "./otp.ts";
 
 // -----------------------------------------------------------------------------
@@ -232,6 +233,8 @@ registerOtpRoutes(fastify);
  */
 async function startServer(): Promise<void> {
   try {
+    await ensureOtpSchema();
+
     const parsedPort = Number.parseInt(process.env.PORT ?? String(DEFAULT_SERVER_PORT), 10);
     const serverPort = Number.isNaN(parsedPort) ? DEFAULT_SERVER_PORT : parsedPort;
     const serverHost =

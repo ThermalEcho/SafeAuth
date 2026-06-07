@@ -6,13 +6,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignInScreen(): React.JSX.Element {
   const [email, setEmail] = useState("");
@@ -34,7 +34,14 @@ export default function SignInScreen(): React.JSX.Element {
       });
 
       if (response.error) {
-        showAlert("Sign in failed", response.error.message ?? "Failed to sign in.");
+        const message = response.error.message ?? "Failed to sign in.";
+
+        showAlert(
+          "Sign in failed",
+          message.toLowerCase().includes("verify")
+            ? "Please verify your email before signing in. We sent another verification email if your account exists."
+            : message,
+        );
         return;
       }
 

@@ -6,7 +6,7 @@ import {
   listOtpAccounts,
   type OtpAccount,
 } from "@/lib/otp-api";
-import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
+import type { BarcodeScanningResult } from "expo-camera";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -15,19 +15,30 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const REFRESH_INTERVAL_MS = 1000;
 
 type EntryMode = "manual" | "scan";
+type ExpoCameraModule = typeof import("expo-camera");
+
+function getExpoCamera(): ExpoCameraModule | null {
+  try {
+    // Keep native camera loading out of Expo Router's route evaluation.
+    // A stale dev client can lack ExpoCamera even when the package is installed.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("expo-camera") as ExpoCameraModule;
+  } catch {
+    return null;
+  }
+}
 
 export default function OtpScreen(): React.JSX.Element {
-  const [permission, requestPermission] = useCameraPermissions();
   const [accounts, setAccounts] = useState<OtpAccount[]>([]);
   const [accountName, setAccountName] = useState("");
   const [issuer, setIssuer] = useState("");
@@ -36,8 +47,6 @@ export default function OtpScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [scanned, setScanned] = useState(false);
-
-  const canScan = permission?.granted === true;
 
   const loadAccounts = useCallback(async (): Promise<void> => {
     try {
@@ -219,24 +228,7 @@ export default function OtpScreen(): React.JSX.Element {
             </Pressable>
           </View>
         ) : (
-          <View style={styles.scannerPanel}>
-            {!permission ? (
-              <ActivityIndicator color="#174ea6" />
-            ) : canScan ? (
-              <CameraView
-                barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                onBarcodeScanned={(result) => void saveScannedCode(result)}
-                style={styles.camera}
-              />
-            ) : (
-              <View style={styles.permissionPanel}>
-                <Text style={styles.permissionText}>Camera access is required to scan QR codes.</Text>
-                <Pressable onPress={requestPermission} style={styles.primaryButton}>
-                  <Text style={styles.primaryButtonText}>Allow camera</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
+          <OtpScannerPanel onScan={(result) => void saveScannedCode(result)} />
         )}
 
         <View style={styles.listHeader}>
@@ -255,6 +247,62 @@ export default function OtpScreen(): React.JSX.Element {
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function OtpScannerPanel({
+  onScan,
+}: {
+  onScan: (result: BarcodeScanningResult) => void;
+}): React.JSX.Element {
+  const cameraModule = getExpoCamera();
+
+  if (!cameraModule) {
+    return (
+      <View style={styles.scannerPanel}>
+        <View style={styles.permissionPanel}>
+          <Text style={styles.permissionText}>
+            Camera scanning is unavailable in this native build. Rebuild the app after installing
+            expo-camera.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return <LoadedOtpScannerPanel cameraModule={cameraModule} onScan={onScan} />;
+}
+
+function LoadedOtpScannerPanel({
+  cameraModule,
+  onScan,
+}: {
+  cameraModule: ExpoCameraModule;
+  onScan: (result: BarcodeScanningResult) => void;
+}): React.JSX.Element {
+  const { CameraView, useCameraPermissions } = cameraModule;
+  const [permission, requestPermission] = useCameraPermissions();
+  const canScan = permission?.granted === true;
+
+  return (
+    <View style={styles.scannerPanel}>
+      {!permission ? (
+        <ActivityIndicator color="#174ea6" />
+      ) : canScan ? (
+        <CameraView
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={onScan}
+          style={styles.camera}
+        />
+      ) : (
+        <View style={styles.permissionPanel}>
+          <Text style={styles.permissionText}>Camera access is required to scan QR codes.</Text>
+          <Pressable onPress={requestPermission} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Allow camera</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
 
