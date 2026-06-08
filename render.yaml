@@ -11,6 +11,8 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: SUPABASE_POOLER_URL
+        sync: false
       - key: BETTER_AUTH_SECRET
         sync: false
       - key: BETTER_AUTH_URL
