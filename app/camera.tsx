@@ -1,6 +1,17 @@
+import {
+  OutlineButton,
+  PageHeader,
+  PrimaryButton,
+  Surface,
+  colors,
+} from "@/components/safeauth-ui";
+import { Box } from "@/components/ui/box";
+import { Pressable } from "@/components/ui/pressable";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type ExpoCameraModule = typeof import("expo-camera");
@@ -18,10 +29,7 @@ function getCameraModule(): ExpoCameraModule | null {
 const cameraModule = getCameraModule();
 
 export default function CameraScreen(): React.JSX.Element {
-  if (!cameraModule) {
-    return <MissingCameraModule />;
-  }
-
+  if (!cameraModule) return <MissingCameraModule />;
   return <CameraScanner cameraModule={cameraModule} />;
 }
 
@@ -34,25 +42,34 @@ function CameraScanner({
   const [lastScan, setLastScan] = useState<string | null>(null);
 
   if (!permission) {
-    return <SafeAreaView style={styles.screen} />;
+    return <View style={{ backgroundColor: colors.background, flex: 1 }} />;
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.screen}>
-        <View style={styles.permissionContainer}>
-          <Text style={styles.title}>Camera access</Text>
-          <Text style={styles.body}>
-            SafeAuth needs camera access to scan authenticator QR codes.
-          </Text>
-          <Pressable style={styles.primaryButton} onPress={requestPermission}>
-            <Text style={styles.primaryButtonText}>Allow camera</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
-            <Text style={styles.secondaryButtonText}>Back</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24 }}
+      >
+        <VStack className="mx-auto w-full max-w-[560px] gap-6">
+          <PageHeader
+            backTo="/home"
+            title="Camera access"
+            subtitle="SafeAuth uses the camera to scan authenticator QR codes."
+          />
+          <Surface>
+            <Text className="leading-6 text-[#607089]">
+              Camera permission stays under your device settings and is only
+              requested when you use scanning features.
+            </Text>
+            <PrimaryButton onPress={() => void requestPermission()}>
+              Allow camera
+            </PrimaryButton>
+            <OutlineButton onPress={() => router.back()}>Not now</OutlineButton>
+          </Surface>
+        </VStack>
+      </ScrollView>
     );
   }
 
@@ -61,23 +78,28 @@ function CameraScanner({
       <CameraView
         barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
         onBarcodeScanned={({ data }) => setLastScan(data)}
-        style={styles.camera}
+        style={StyleSheet.absoluteFill}
       />
       <SafeAreaView style={styles.overlay}>
-        <View style={styles.topBar}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          className="self-start rounded-full bg-[#0B2A57]/90 px-5 py-3"
+          onPress={() => router.back()}
+        >
+          <Text className="font-bold text-white">Back</Text>
+        </Pressable>
 
-        <View style={styles.scanFrame} />
+        <Box className="mx-auto aspect-square w-[78%] max-w-[320px] rounded-[28px] border-4 border-white" />
 
-        <View style={styles.resultPanel}>
-          <Text style={styles.resultLabel}>Last scan</Text>
-          <Text numberOfLines={2} style={styles.resultText}>
-            {lastScan ?? "Point the camera at a QR code."}
-          </Text>
-        </View>
+        <Box className="rounded-[24px] bg-[#0B2A57]/95 p-5">
+          <VStack className="gap-2">
+            <Text className="text-xs font-bold uppercase tracking-[1.5px] text-[#AFC8EB]">
+              Last scan
+            </Text>
+            <Text selectable numberOfLines={3} className="text-base leading-6 text-white">
+              {lastScan ?? "Point the camera at a QR code."}
+            </Text>
+          </VStack>
+        </Box>
       </SafeAreaView>
     </View>
   );
@@ -85,122 +107,36 @@ function CameraScanner({
 
 function MissingCameraModule(): React.JSX.Element {
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.permissionContainer}>
-        <Text style={styles.title}>Camera unavailable</Text>
-        <Text selectable style={styles.body}>
-          This app build does not include expo-camera. Rebuild the native app, then
-          restart Expo.
-        </Text>
-        <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
-          <Text style={styles.secondaryButtonText}>Back</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      style={{ backgroundColor: colors.background }}
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24 }}
+    >
+      <VStack className="mx-auto w-full max-w-[560px] gap-6">
+        <PageHeader
+          backTo="/home"
+          title="Camera unavailable"
+          subtitle="This app build does not include the camera module."
+        />
+        <Surface>
+          <Text selectable className="leading-6 text-[#607089]">
+            Rebuild the native app, then restart Expo to enable QR scanning.
+          </Text>
+          <OutlineButton onPress={() => router.back()}>Back to SafeAuth</OutlineButton>
+        </Surface>
+      </VStack>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: "#f6f7fb",
-    flex: 1,
-  },
   cameraScreen: {
     backgroundColor: "#000000",
     flex: 1,
-  },
-  camera: {
-    ...StyleSheet.absoluteFillObject,
   },
   overlay: {
     flex: 1,
     justifyContent: "space-between",
     padding: 20,
-  },
-  topBar: {
-    alignItems: "flex-start",
-  },
-  backButton: {
-    backgroundColor: "rgba(16, 24, 40, 0.72)",
-    borderRadius: 8,
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  backButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  scanFrame: {
-    alignSelf: "center",
-    aspectRatio: 1,
-    borderColor: "#ffffff",
-    borderRadius: 8,
-    borderWidth: 3,
-    maxWidth: 320,
-    width: "78%",
-  },
-  resultPanel: {
-    backgroundColor: "rgba(16, 24, 40, 0.86)",
-    borderRadius: 8,
-    gap: 6,
-    padding: 16,
-  },
-  resultLabel: {
-    color: "#cbd5e1",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0,
-    textTransform: "uppercase",
-  },
-  resultText: {
-    color: "#ffffff",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  permissionContainer: {
-    flex: 1,
-    gap: 14,
-    justifyContent: "center",
-    padding: 24,
-  },
-  title: {
-    color: "#101828",
-    fontSize: 30,
-    fontWeight: "800",
-    letterSpacing: 0,
-  },
-  body: {
-    color: "#475467",
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 12,
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#174ea6",
-    borderRadius: 8,
-    justifyContent: "center",
-    minHeight: 52,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 52,
-  },
-  secondaryButtonText: {
-    color: "#174ea6",
-    fontSize: 16,
-    fontWeight: "700",
   },
 });

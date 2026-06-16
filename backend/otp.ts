@@ -69,10 +69,12 @@ interface OtpAccountResponse {
   code: string;
   createdAt: string;
   digits: number;
+  generatedAt: string;
   id: string;
   issuer: string;
   period: number;
   remainingSeconds: number;
+  validUntil: string;
 }
 
 function deriveSecretKey(): Buffer {
@@ -248,18 +250,21 @@ function getRemainingSeconds(period: number, now = Date.now()): number {
   return period - (Math.floor(now / 1000) % period);
 }
 
-function toOtpAccountResponse(row: OtpAccountRow): OtpAccountResponse {
+function toOtpAccountResponse(row: OtpAccountRow, now = Date.now()): OtpAccountResponse {
   const secret = decryptSecret(row);
+  const periodStartedAt = Math.floor(now / 1000 / row.period) * row.period * 1000;
 
   return {
     accountName: row.account_name,
-    code: generateTotp(secret, row.period, row.digits),
+    code: generateTotp(secret, row.period, row.digits, now),
     createdAt: row.created_at.toISOString(),
     digits: row.digits,
+    generatedAt: new Date(now).toISOString(),
     id: row.id,
     issuer: row.issuer,
     period: row.period,
-    remainingSeconds: getRemainingSeconds(row.period),
+    remainingSeconds: getRemainingSeconds(row.period, now),
+    validUntil: new Date(periodStartedAt + row.period * 1000).toISOString(),
   };
 }
 
@@ -307,7 +312,9 @@ export function registerOtpRoutes(fastify: FastifyInstance): void {
       [session.user.id],
     );
 
-    return reply.send({ accounts: result.rows.map(toOtpAccountResponse) });
+    const now = Date.now();
+
+    return reply.send({ accounts: result.rows.map((row) => toOtpAccountResponse(row, now)) });
   });
 
   fastify.post<{ Body: OtpCreateBody }>(OTP_ROUTE_PREFIX, async (request, reply) => {
@@ -329,7 +336,13 @@ export function registerOtpRoutes(fastify: FastifyInstance): void {
 
     const encryptedSecret = encryptSecret(parsedInput.secret);
     const result = await pool.query<OtpAccountRow>(
-      `insert into public.otp_account (
+      `with removed_stale_label as (
+         delete from public.otp_account
+          where user_id = $1
+            and label_hash = $4
+            and secret_fingerprint <> $8
+       )
+       insert into public.otp_account (
           user_id, issuer, account_name, label_hash, secret_ciphertext, secret_iv,
           secret_auth_tag, secret_fingerprint, algorithm, digits, period
         )
@@ -356,7 +369,7 @@ export function registerOtpRoutes(fastify: FastifyInstance): void {
       ],
     );
 
-    return reply.status(201).send({ account: toOtpAccountResponse(result.rows[0]) });
+    return reply.status(201).send({ account: toOtpAccountResponse(result.rows[0], Date.now()) });
   });
 
   fastify.delete<{ Params: { id: string } }>(`${OTP_ROUTE_PREFIX}/:id`, async (request, reply) => {

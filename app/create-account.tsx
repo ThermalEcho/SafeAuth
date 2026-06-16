@@ -1,18 +1,18 @@
+import {
+  BrandLogo,
+  Field,
+  PrimaryButton,
+  Surface,
+  colors,
+} from "@/components/safeauth-ui";
+import { Pressable } from "@/components/ui/pressable";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
 import { authClient } from "@/lib/auth-client";
 import { showAlert, showAlertWithAction, validateEmail } from "@/lib/auth-utils";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -29,20 +29,17 @@ export default function CreateAccountScreen(): React.JSX.Element {
     if (password.length < MIN_PASSWORD_LENGTH) {
       return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
     }
-
     return null;
   }
 
   async function handleSignUp(): Promise<void> {
     const validationMessage = validateForm();
-
     if (validationMessage) {
       showAlert("Validation error", validationMessage);
       return;
     }
 
     setLoading(true);
-
     try {
       const response = await authClient.signUp.email({
         name: name.trim(),
@@ -69,159 +66,76 @@ export default function CreateAccountScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.flex}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ backgroundColor: colors.background, flex: 1 }}
+    >
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24 }}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Pressable onPress={() => router.back()} hitSlop={12}>
-              <Text style={styles.backText}>Back</Text>
-            </Pressable>
-          </View>
+        <VStack className="mx-auto w-full max-w-[520px] gap-6">
+          <BrandLogo compact />
+          <Surface>
+            <VStack className="gap-2">
+              <Text className="text-sm font-bold uppercase tracking-[1.5px] text-[#146EF5]">
+                Get protected
+              </Text>
+              <Text className="text-3xl font-black text-[#10213A]">
+                Create your account
+              </Text>
+              <Text className="leading-6 text-[#607089]">
+                Use an email address you can verify after sign up.
+              </Text>
+            </VStack>
 
-          <View style={styles.form}>
-            <Text style={styles.title}>Create account</Text>
-            <Text style={styles.subtitle}>Use an email you can verify after sign up.</Text>
+            <VStack className="gap-4">
+              <Field
+                label="Full name"
+                autoComplete="name"
+                editable={!loading}
+                onChangeText={setName}
+                placeholder="Your name"
+                value={name}
+              />
+              <Field
+                label="Email address"
+                autoCapitalize="none"
+                autoComplete="email"
+                editable={!loading}
+                inputMode="email"
+                keyboardType="email-address"
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                value={email}
+              />
+              <Field
+                label="Password"
+                autoComplete="new-password"
+                editable={!loading}
+                onChangeText={setPassword}
+                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                secureTextEntry
+                value={password}
+              />
+            </VStack>
 
-            <TextInput
-              autoComplete="name"
-              editable={!loading}
-              onChangeText={setName}
-              placeholder="Full name"
-              placeholderTextColor="#7c8798"
-              style={styles.input}
-              value={name}
-            />
-
-            <TextInput
-              autoCapitalize="none"
-              autoComplete="email"
-              editable={!loading}
-              inputMode="email"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="Email address"
-              placeholderTextColor="#7c8798"
-              style={styles.input}
-              value={email}
-            />
-
-            <TextInput
-              autoComplete="new-password"
-              editable={!loading}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor="#7c8798"
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
-
-            <Text style={styles.hint}>Use at least {MIN_PASSWORD_LENGTH} characters.</Text>
+            <PrimaryButton loading={loading} onPress={() => void handleSignUp()}>
+              {loading ? "Creating account" : "Create secure account"}
+            </PrimaryButton>
 
             <Pressable
-              disabled={loading}
-              onPress={handleSignUp}
-              style={[styles.primaryButton, loading && styles.disabledButton]}
+              className="items-center rounded-xl py-2"
+              onPress={() => router.push("/sign-in")}
             >
-              <Text style={styles.primaryButtonText}>
-                {loading ? "Creating..." : "Create account"}
+              <Text className="font-bold text-[#146EF5]">
+                Already registered? Sign in
               </Text>
             </Pressable>
-
-            <Pressable onPress={() => router.push("/sign-in")} style={styles.linkButton}>
-              <Text style={styles.linkButtonText}>Sign in instead</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </Surface>
+        </VStack>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  screen: {
-    backgroundColor: "#f6f7fb",
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-  header: {
-    left: 24,
-    position: "absolute",
-    top: 24,
-  },
-  backText: {
-    color: "#174ea6",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  form: {
-    gap: 14,
-    width: "100%",
-  },
-  title: {
-    color: "#101828",
-    fontSize: 34,
-    fontWeight: "800",
-    letterSpacing: 0,
-  },
-  subtitle: {
-    color: "#475467",
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 12,
-  },
-  input: {
-    backgroundColor: "#ffffff",
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: "#101828",
-    fontSize: 16,
-    minHeight: 52,
-    paddingHorizontal: 14,
-  },
-  hint: {
-    color: "#667085",
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#174ea6",
-    borderRadius: 8,
-    justifyContent: "center",
-    marginTop: 8,
-    minHeight: 52,
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  linkButton: {
-    alignItems: "center",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  linkButtonText: {
-    color: "#174ea6",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});

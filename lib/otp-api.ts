@@ -5,10 +5,12 @@ export interface OtpAccount {
   code: string;
   createdAt: string;
   digits: number;
+  generatedAt: string;
   id: string;
   issuer: string;
   period: number;
   remainingSeconds: number;
+  validUntil: string;
 }
 
 export interface CreateOtpAccountInput {

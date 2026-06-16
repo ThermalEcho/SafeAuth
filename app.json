@@ -38,6 +38,18 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SafeAuth to select QR code images from your photo library."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow SafeAuth to use Face ID for app lock."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
@@ -48,7 +60,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,24 +1,62 @@
+import {
+  BrandLogo,
+  DangerButton,
+  OutlineButton,
+  PrimaryButton,
+  Surface,
+  colors,
+} from "@/components/safeauth-ui";
+import { Box } from "@/components/ui/box";
+import { Heading } from "@/components/ui/heading";
+import { HStack } from "@/components/ui/hstack";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
 import { authClient, notifyAuthStateChanged, setBearerToken } from "@/lib/auth-client";
 import { showAlert } from "@/lib/auth-utils";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, useWindowDimensions } from "react-native";
+
+const homeActions = [
+  {
+    action: "Open OTP codes",
+    detail: "View current codes and add accounts manually or by QR.",
+    eyebrow: "Authenticator",
+    href: "/otp" as Href,
+    title: "OTP code vault",
+    variant: "primary",
+  },
+  {
+    action: "Open camera",
+    detail: "Scan and inspect QR data using the device camera.",
+    eyebrow: "Scanner",
+    href: "/camera" as Href,
+    title: "QR camera",
+    variant: "outline",
+  },
+  {
+    action: "Open settings",
+    detail: "Adjust appearance, PIN lock, and biometric unlock.",
+    eyebrow: "Settings",
+    href: "/settings" as Href,
+    title: "App settings",
+    variant: "outline",
+  },
+] as const;
 
 export default function HomeScreen(): React.JSX.Element {
   const [signingOut, setSigningOut] = useState(false);
+  const { width } = useWindowDimensions();
+  const wide = width >= 720;
 
   async function handleLogout(): Promise<void> {
     setSigningOut(true);
-
     try {
       const response = await authClient.signOut();
-
       if (response.error) {
         showAlert("Logout failed", response.error.message ?? "Failed to log out.");
         return;
       }
-
       setBearerToken(null);
       notifyAuthStateChanged();
       router.replace("/");
@@ -30,116 +68,65 @@ export default function HomeScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.panel}>
-          <Text style={styles.eyebrow}>Authenticated</Text>
-          <Text style={styles.title}>SafeAuth Home</Text>
-          <Text style={styles.body}>
-            Manage the authenticator codes saved to your SafeAuth account.
-          </Text>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      style={{ backgroundColor: colors.background }}
+      contentContainerStyle={{ flexGrow: 1, padding: 24 }}
+    >
+      <VStack className="mx-auto w-full max-w-[960px] gap-7 py-3">
+        <BrandLogo compact />
+        <Surface className="overflow-hidden">
+          <HStack className={`gap-8 ${wide ? "items-center" : "flex-col"}`}>
+            <VStack className="flex-1 gap-4">
+              <HStack className="items-center gap-2">
+                <Box className="h-2.5 w-2.5 rounded-full bg-[#21A366]" />
+                <Text className="text-sm font-bold uppercase tracking-[1.5px] text-[#34815C]">
+                  Authenticated
+                </Text>
+              </HStack>
+              <Heading size="4xl" className="leading-tight text-[#10213A]">
+                Your security hub
+              </Heading>
+              <Text className="max-w-[560px] text-lg leading-7 text-[#607089]">
+                Manage one-time codes and scan authenticator QR codes from your
+                protected SafeAuth session.
+              </Text>
+            </VStack>
+            <Box className="h-32 w-32 items-center justify-center rounded-[36px] bg-[#EAF2FF]">
+              <Text className="text-5xl font-black text-[#146EF5]">✓</Text>
+            </Box>
+          </HStack>
+        </Surface>
 
-          <Pressable style={styles.primaryButton} onPress={() => router.push("/otp")}>
-            <Text style={styles.primaryButtonText}>Open OTP codes</Text>
-          </Pressable>
+        <HStack className={`gap-5 ${wide ? "" : "flex-col"}`}>
+          {homeActions.map((item) => (
+            <Surface key={item.title} className="flex-1">
+              <VStack className="gap-3">
+                <Text className="text-sm font-bold uppercase tracking-[1.5px] text-[#146EF5]">
+                  {item.eyebrow}
+                </Text>
+                <Heading size="2xl" className="text-[#10213A]">
+                  {item.title}
+                </Heading>
+                <Text className="leading-6 text-[#607089]">{item.detail}</Text>
+                {item.variant === "primary" ? (
+                  <PrimaryButton onPress={() => router.push(item.href)}>
+                    {item.action}
+                  </PrimaryButton>
+                ) : (
+                  <OutlineButton onPress={() => router.push(item.href)}>
+                    {item.action}
+                  </OutlineButton>
+                )}
+              </VStack>
+            </Surface>
+          ))}
+        </HStack>
 
-          <Pressable style={styles.secondaryButton} onPress={() => router.push("/camera")}>
-            <Text style={styles.secondaryButtonText}>Open camera</Text>
-          </Pressable>
-
-          <Pressable
-            disabled={signingOut}
-            onPress={handleLogout}
-            style={[styles.logoutButton, signingOut && styles.disabledButton]}
-          >
-            <Text style={styles.logoutButtonText}>
-              {signingOut ? "Logging out..." : "Logout"}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </SafeAreaView>
+        <DangerButton loading={signingOut} onPress={() => void handleLogout()}>
+          {signingOut ? "Signing out" : "Sign out securely"}
+        </DangerButton>
+      </VStack>
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: "#f6f7fb",
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-  panel: {
-    backgroundColor: "#ffffff",
-    borderColor: "#d8dee9",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 14,
-    padding: 20,
-  },
-  eyebrow: {
-    color: "#536176",
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: "#101828",
-    fontSize: 30,
-    fontWeight: "800",
-    letterSpacing: 0,
-  },
-  body: {
-    color: "#475467",
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#174ea6",
-    borderRadius: 8,
-    justifyContent: "center",
-    marginTop: 12,
-    minHeight: 52,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderColor: "#174ea6",
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 52,
-  },
-  secondaryButtonText: {
-    color: "#174ea6",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  logoutButton: {
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderColor: "#dc2626",
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 52,
-  },
-  logoutButtonText: {
-    color: "#b42318",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-});

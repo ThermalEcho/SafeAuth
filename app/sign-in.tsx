@@ -1,18 +1,18 @@
+import {
+  BrandLogo,
+  Field,
+  PrimaryButton,
+  Surface,
+  colors,
+} from "@/components/safeauth-ui";
+import { Pressable } from "@/components/ui/pressable";
+import { Text } from "@/components/ui/text";
+import { VStack } from "@/components/ui/vstack";
 import { authClient, notifyAuthStateChanged, setBearerToken } from "@/lib/auth-client";
 import { showAlert, showAlertWithAction } from "@/lib/auth-utils";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 
 export default function SignInScreen(): React.JSX.Element {
   const [email, setEmail] = useState("");
@@ -35,7 +35,6 @@ export default function SignInScreen(): React.JSX.Element {
 
       if (response.error) {
         const message = response.error.message ?? "Failed to sign in.";
-
         showAlert(
           "Sign in failed",
           message.toLowerCase().includes("verify")
@@ -56,140 +55,72 @@ export default function SignInScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.flex}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ backgroundColor: colors.background, flex: 1 }}
+    >
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: "center",
+          padding: 24,
+        }}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Pressable onPress={() => router.back()} hitSlop={12}>
-              <Text style={styles.backText}>Back</Text>
-            </Pressable>
-          </View>
+        <VStack className="mx-auto w-full max-w-[520px] gap-6">
+          <BrandLogo compact />
+          <Surface>
+            <VStack className="gap-2">
+              <Text className="text-sm font-bold uppercase tracking-[1.5px] text-[#146EF5]">
+                Welcome back
+              </Text>
+              <Text className="text-3xl font-black text-[#10213A]">
+                Sign in to SafeAuth
+              </Text>
+              <Text className="leading-6 text-[#607089]">
+                Access your protected authenticator codes.
+              </Text>
+            </VStack>
 
-          <View style={styles.form}>
-            <Text style={styles.title}>Welcome back</Text>
-            <Text style={styles.subtitle}>Sign in with your SafeAuth account.</Text>
+            <VStack className="gap-4">
+              <Field
+                label="Email address"
+                autoCapitalize="none"
+                autoComplete="email"
+                editable={!loading}
+                inputMode="email"
+                keyboardType="email-address"
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                value={email}
+              />
+              <Field
+                label="Password"
+                autoComplete="password"
+                editable={!loading}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                secureTextEntry
+                value={password}
+              />
+            </VStack>
 
-            <TextInput
-              autoCapitalize="none"
-              autoComplete="email"
-              editable={!loading}
-              inputMode="email"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="Email address"
-              placeholderTextColor="#7c8798"
-              style={styles.input}
-              value={email}
-            />
-
-            <TextInput
-              autoComplete="password"
-              editable={!loading}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor="#7c8798"
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
+            <PrimaryButton loading={loading} onPress={() => void handleSignIn()}>
+              {loading ? "Signing in" : "Sign in"}
+            </PrimaryButton>
 
             <Pressable
-              disabled={loading}
-              onPress={handleSignIn}
-              style={[styles.primaryButton, loading && styles.disabledButton]}
+              className="items-center rounded-xl py-2"
+              onPress={() => router.push("/create-account")}
             >
-              <Text style={styles.primaryButtonText}>{loading ? "Signing in..." : "Sign in"}</Text>
+              <Text className="font-bold text-[#146EF5]">
+                New to SafeAuth? Create an account
+              </Text>
             </Pressable>
-
-            <Pressable onPress={() => router.push("/create-account")} style={styles.linkButton}>
-              <Text style={styles.linkButtonText}>Create account</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </Surface>
+        </VStack>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  screen: {
-    backgroundColor: "#f6f7fb",
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-  header: {
-    left: 24,
-    position: "absolute",
-    top: 24,
-  },
-  backText: {
-    color: "#174ea6",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  form: {
-    gap: 14,
-    width: "100%",
-  },
-  title: {
-    color: "#101828",
-    fontSize: 34,
-    fontWeight: "800",
-    letterSpacing: 0,
-  },
-  subtitle: {
-    color: "#475467",
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 12,
-  },
-  input: {
-    backgroundColor: "#ffffff",
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: "#101828",
-    fontSize: 16,
-    minHeight: 52,
-    paddingHorizontal: 14,
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#174ea6",
-    borderRadius: 8,
-    justifyContent: "center",
-    marginTop: 8,
-    minHeight: 52,
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  linkButton: {
-    alignItems: "center",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  linkButtonText: {
-    color: "#174ea6",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});
