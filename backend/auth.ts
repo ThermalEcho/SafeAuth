@@ -195,18 +195,6 @@ export const auth = betterAuth({
       generateId: "serial",
     },
   },
-  schema: {
-    user: {
-      additionalFields: {
-        password: {
-          type: "string",
-          input: true,
-          returned: false,
-          required: false,
-        },
-      },
-    },
-  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
