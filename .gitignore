@@ -33,7 +33,6 @@ yarn-error.*
 # local env files
 .env
 .env.*
-!.env.example
 .env*.local
 
 # local diagnostics
@@ -41,6 +40,10 @@ bugreport-*.zip
 *.log
 *.tmp
 *.bak
+
+# generated test/build output
+dist-test/
+backend/server_output.txt
 
 # typescript
 *.tsbuildinfo
