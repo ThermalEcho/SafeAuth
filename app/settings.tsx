@@ -1,4 +1,4 @@
-import { PageHeader, Surface, colors } from "@/components/safeauth-ui";
+import { PageHeader, Surface, useSafeAuthTheme } from "@/components/safeauth-ui";
 import { HStack } from "@/components/ui/hstack";
 import { Pressable } from "@/components/ui/pressable";
 import { Text } from "@/components/ui/text";
@@ -30,6 +30,8 @@ const settingsRoutes: SettingsRoute[] = [
 ];
 
 export default function SettingsScreen(): React.JSX.Element {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
@@ -53,13 +55,22 @@ export default function SettingsScreen(): React.JSX.Element {
               <Surface>
                 <HStack className="items-center justify-between gap-4">
                   <VStack className="min-w-0 flex-1 gap-1">
-                    <Text className="text-xs font-bold uppercase tracking-[1.5px] text-[#146EF5]">
+                    <Text
+                      className="text-xs font-bold uppercase tracking-[1.5px]"
+                      style={{ color: colors.accent }}
+                    >
                       {route.label}
                     </Text>
-                    <Text className="text-xl font-black text-[#10213A]">{route.title}</Text>
-                    <Text className="leading-6 text-[#607089]">{route.detail}</Text>
+                    <Text className="text-xl font-black" style={{ color: colors.ink }}>
+                      {route.title}
+                    </Text>
+                    <Text className="leading-6" style={{ color: colors.muted }}>
+                      {route.detail}
+                    </Text>
                   </VStack>
-                  <Text className="text-2xl font-black text-[#146EF5]">{">"}</Text>
+                  <Text className="text-2xl font-black" style={{ color: colors.accent }}>
+                    {">"}
+                  </Text>
                 </HStack>
               </Surface>
             </Pressable>

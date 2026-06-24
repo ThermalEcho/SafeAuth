@@ -4,7 +4,7 @@ import {
   PageHeader,
   PrimaryButton,
   Surface,
-  colors,
+  useSafeAuthTheme,
 } from "@/components/safeauth-ui";
 import { HStack } from "@/components/ui/hstack";
 import { Spinner } from "@/components/ui/spinner";
@@ -58,6 +58,7 @@ function getBiometricLabel(types: LocalAuthentication.AuthenticationType[]): str
 }
 
 export default function SecuritySettingsScreen(): React.JSX.Element {
+  const { colors } = useSafeAuthTheme();
   const [biometricStatus, setBiometricStatus] = useState<BiometricStatus>(
     defaultBiometricStatus,
   );
@@ -202,17 +203,17 @@ export default function SecuritySettingsScreen(): React.JSX.Element {
         />
 
         {loading ? (
-          <HStack className="items-center gap-3 rounded-2xl bg-[#EAF2FF] p-4">
-            <Spinner color="#146EF5" />
-            <Text className="font-semibold text-[#315B91]">Loading security settings...</Text>
+          <HStack className="items-center gap-3 rounded-2xl p-4" style={{ backgroundColor: colors.accentSoft }}>
+            <Spinner color={colors.accent} />
+            <Text className="font-semibold" style={{ color: colors.spinnerText }}>Loading security settings...</Text>
           </HStack>
         ) : null}
 
         <Surface>
           <VStack className="gap-4">
             <VStack className="gap-1">
-              <Text className="text-xl font-black text-[#10213A]">PIN lock</Text>
-              <Text className="leading-6 text-[#607089]">
+              <Text className="text-xl font-black" style={{ color: colors.ink }}>PIN lock</Text>
+              <Text className="leading-6" style={{ color: colors.muted }}>
                 {settings.pinEnabled && storedPinExists
                   ? "PIN unlock is active."
                   : "Use a 4 to 8 digit PIN."}
@@ -262,10 +263,10 @@ export default function SecuritySettingsScreen(): React.JSX.Element {
         <Surface>
           <HStack className="items-center justify-between gap-4">
             <VStack className="min-w-0 flex-1 gap-1">
-              <Text className="text-xl font-black text-[#10213A]">
+              <Text className="text-xl font-black" style={{ color: colors.ink }}>
                 {biometricStatus.label}
               </Text>
-              <Text className="leading-6 text-[#607089]">
+              <Text className="leading-6" style={{ color: colors.muted }}>
                 {biometricStatus.available && biometricStatus.enrolled
                   ? "Biometric unlock is available on this device."
                   : "No enrolled biometric method is available."}
@@ -273,10 +274,10 @@ export default function SecuritySettingsScreen(): React.JSX.Element {
             </VStack>
             <Switch
               disabled={saving || !biometricStatus.available || !biometricStatus.enrolled}
-              ios_backgroundColor="#DDE5EF"
+              ios_backgroundColor={colors.border}
               onValueChange={(enabled) => void toggleBiometrics(enabled)}
-              thumbColor={settings.biometricsEnabled ? "#FFFFFF" : "#F9FBFD"}
-              trackColor={{ false: "#C8D3E0", true: "#146EF5" }}
+              thumbColor={settings.biometricsEnabled ? colors.white : colors.field}
+              trackColor={{ false: colors.fieldBorder, true: colors.accent }}
               value={settings.biometricsEnabled}
             />
           </HStack>

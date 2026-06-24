@@ -3,7 +3,7 @@ import {
   Field,
   PrimaryButton,
   Surface,
-  colors,
+  useSafeAuthTheme,
 } from "@/components/safeauth-ui";
 import { Pressable } from "@/components/ui/pressable";
 import { Text } from "@/components/ui/text";
@@ -17,6 +17,7 @@ import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function CreateAccountScreen(): React.JSX.Element {
+  const { colors } = useSafeAuthTheme();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -79,57 +80,29 @@ export default function CreateAccountScreen(): React.JSX.Element {
           <BrandLogo compact />
           <Surface>
             <VStack className="gap-2">
-              <Text className="text-sm font-bold uppercase tracking-[1.5px] text-[#146EF5]">
+              <Text className="text-sm font-bold uppercase tracking-[1.5px]" style={{ color: colors.accent }}>
                 Get protected
               </Text>
-              <Text className="text-3xl font-black text-[#10213A]">
+              <Text className="text-3xl font-black" style={{ color: colors.ink }}>
                 Create your account
               </Text>
-              <Text className="leading-6 text-[#607089]">
+              <Text className="leading-6" style={{ color: colors.muted }}>
                 Use an email address you can verify after sign up.
               </Text>
             </VStack>
 
             <VStack className="gap-4">
-              <Field
-                label="Full name"
-                autoComplete="name"
-                editable={!loading}
-                onChangeText={setName}
-                placeholder="Your name"
-                value={name}
-              />
-              <Field
-                label="Email address"
-                autoCapitalize="none"
-                autoComplete="email"
-                editable={!loading}
-                inputMode="email"
-                keyboardType="email-address"
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                value={email}
-              />
-              <Field
-                label="Password"
-                autoComplete="new-password"
-                editable={!loading}
-                onChangeText={setPassword}
-                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-                secureTextEntry
-                value={password}
-              />
+              <Field label="Full name" autoComplete="name" editable={!loading} onChangeText={setName} placeholder="Your name" value={name} />
+              <Field label="Email address" autoCapitalize="none" autoComplete="email" editable={!loading} inputMode="email" keyboardType="email-address" onChangeText={setEmail} placeholder="you@example.com" value={email} />
+              <Field label="Password" autoComplete="new-password" editable={!loading} onChangeText={setPassword} placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`} secureTextEntry value={password} />
             </VStack>
 
             <PrimaryButton loading={loading} onPress={() => void handleSignUp()}>
               {loading ? "Creating account" : "Create secure account"}
             </PrimaryButton>
 
-            <Pressable
-              className="items-center rounded-xl py-2"
-              onPress={() => router.push("/sign-in")}
-            >
-              <Text className="font-bold text-[#146EF5]">
+            <Pressable className="items-center rounded-xl py-2" onPress={() => router.push("/sign-in")}>
+              <Text className="font-bold" style={{ color: colors.accent }}>
                 Already registered? Sign in
               </Text>
             </Pressable>

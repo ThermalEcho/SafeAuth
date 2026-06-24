@@ -4,7 +4,7 @@ import {
   OutlineButton,
   PrimaryButton,
   Surface,
-  colors,
+  useSafeAuthTheme,
 } from "@/components/safeauth-ui";
 import { Box } from "@/components/ui/box";
 import { Heading } from "@/components/ui/heading";
@@ -36,6 +36,7 @@ export function AppLockScreen({
   onUnlocked: () => void;
   settings: AppLockSettings;
 }): React.JSX.Element {
+  const { colors } = useSafeAuthTheme();
   const [biometricLabel, setBiometricLabel] = useState("Biometrics");
   const [pin, setPin] = useState("");
   const [checkingBiometrics, setCheckingBiometrics] = useState(false);
@@ -47,10 +48,7 @@ export function AppLockScreen({
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
       if (!hasHardware || !isEnrolled) {
-        showAlert(
-          "Biometrics unavailable",
-          "Use your PIN or enroll biometrics in device settings.",
-        );
+        showAlert("Biometrics unavailable", "Use your PIN or enroll biometrics in device settings.");
         return;
       }
 
@@ -64,10 +62,7 @@ export function AppLockScreen({
         onUnlocked();
       }
     } catch (error: unknown) {
-      showAlert(
-        "Could not unlock",
-        error instanceof Error ? error.message : "Biometric authentication failed.",
-      );
+      showAlert("Could not unlock", error instanceof Error ? error.message : "Biometric authentication failed.");
     } finally {
       setCheckingBiometrics(false);
     }
@@ -105,47 +100,32 @@ export function AppLockScreen({
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={{
-        flexGrow: 1,
-        justifyContent: "center",
-        padding: 24,
-      }}
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24 }}
     >
       <VStack className="mx-auto w-full max-w-[520px] gap-6">
         <BrandLogo compact />
         <Surface>
           <VStack className="gap-2">
-            <Box className="h-12 w-12 items-center justify-center rounded-2xl bg-[#EAF2FF]">
-              <Text className="text-sm font-black text-[#146EF5]">PIN</Text>
+            <Box className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.accentSoft }}>
+              <Text className="text-sm font-black" style={{ color: colors.accent }}>PIN</Text>
             </Box>
-            <Heading size="2xl" className="text-[#10213A]">
+            <Heading size="2xl" style={{ color: colors.ink }}>
               SafeAuth is locked
             </Heading>
-            <Text className="leading-6 text-[#607089]">
+            <Text className="leading-6" style={{ color: colors.muted }}>
               Confirm your app lock method to continue.
             </Text>
           </VStack>
 
           {settings.pinEnabled ? (
             <VStack className="gap-4">
-              <Field
-                label="PIN"
-                keyboardType="number-pad"
-                maxLength={8}
-                onChangeText={(value) => setPin(value.replace(/\D/g, "").slice(0, 8))}
-                placeholder="Enter PIN"
-                secureTextEntry
-                value={pin}
-              />
+              <Field label="PIN" keyboardType="number-pad" maxLength={8} onChangeText={(value) => setPin(value.replace(/\D/g, "").slice(0, 8))} placeholder="Enter PIN" secureTextEntry value={pin} />
               <PrimaryButton onPress={() => void unlockWithPin()}>Unlock with PIN</PrimaryButton>
             </VStack>
           ) : null}
 
           {settings.biometricsEnabled ? (
-            <OutlineButton
-              loading={checkingBiometrics}
-              onPress={() => void unlockWithBiometrics()}
-            >
+            <OutlineButton loading={checkingBiometrics} onPress={() => void unlockWithBiometrics()}>
               {checkingBiometrics ? "Checking" : `Unlock with ${biometricLabel}`}
             </OutlineButton>
           ) : null}

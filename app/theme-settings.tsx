@@ -1,7 +1,7 @@
 import {
   PageHeader,
   Surface,
-  colors,
+  useSafeAuthTheme,
 } from "@/components/safeauth-ui";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
@@ -41,6 +41,7 @@ const themeOptions: {
 ];
 
 export default function ThemeSettingsScreen(): React.JSX.Element {
+  const { colors } = useSafeAuthTheme();
   const [preference, setPreference] = useState<ThemePreference>("system");
   const [saving, setSaving] = useState(false);
 
@@ -86,24 +87,34 @@ export default function ThemeSettingsScreen(): React.JSX.Element {
                   key={option.value}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selected, disabled: saving }}
-                  className={`rounded-2xl border p-4 ${
-                    selected ? "border-[#146EF5] bg-[#EAF2FF]" : "border-[#DDE5EF] bg-[#F9FBFD]"
-                  }`}
+                  className="rounded-2xl border p-4"
+                  style={{
+                    backgroundColor: selected ? colors.accentSoft : colors.surfaceAlt,
+                    borderColor: selected ? colors.accent : colors.border,
+                  }}
                   disabled={saving}
                   onPress={() => void chooseTheme(option.value)}
                 >
                   <HStack className="items-center justify-between gap-4">
                     <VStack className="min-w-0 flex-1 gap-1">
-                      <Text className="text-lg font-black text-[#10213A]">{option.label}</Text>
-                      <Text className="leading-6 text-[#607089]">{option.detail}</Text>
+                      <Text className="text-lg font-black" style={{ color: colors.ink }}>
+                        {option.label}
+                      </Text>
+                      <Text className="leading-6" style={{ color: colors.muted }}>
+                        {option.detail}
+                      </Text>
                     </VStack>
                     <Box
-                      className={`h-7 w-7 items-center justify-center rounded-full border ${
-                        selected ? "border-[#146EF5] bg-[#146EF5]" : "border-[#B8CAE2] bg-white"
-                      }`}
+                      className="h-7 w-7 items-center justify-center rounded-full border"
+                      style={{
+                        backgroundColor: selected ? colors.accent : colors.surface,
+                        borderColor: selected ? colors.accent : colors.fieldBorder,
+                      }}
                     >
                       {selected ? (
-                        <Text className="text-sm font-black text-white">OK</Text>
+                        <Text className="text-sm font-black" style={{ color: colors.white }}>
+                          OK
+                        </Text>
                       ) : null}
                     </Box>
                   </HStack>

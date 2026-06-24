@@ -4,7 +4,7 @@ import {
   PageHeader,
   PrimaryButton,
   Surface,
-  colors,
+  useSafeAuthTheme,
 } from "@/components/safeauth-ui";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
@@ -43,6 +43,7 @@ function getExpoImagePicker(): ExpoImagePickerModule | null {
 }
 
 export default function CreateOtpScreen(): React.JSX.Element {
+  const { colors } = useSafeAuthTheme();
   const [accountName, setAccountName] = useState("");
   const [issuer, setIssuer] = useState("");
   const [secret, setSecret] = useState("");
@@ -108,25 +109,20 @@ export default function CreateOtpScreen(): React.JSX.Element {
             subtitle="Enter a secret manually or scan the authenticator QR code."
           />
 
-          <HStack className="rounded-2xl bg-[#E4EAF2] p-1">
+          <HStack className="rounded-2xl p-1" style={{ backgroundColor: colors.segment }}>
             {(["manual", "scan"] as const).map((mode) => {
               const active = entryMode === mode;
               return (
                 <Pressable
                   key={mode}
-                  className={`flex-1 items-center rounded-xl px-4 py-3 ${
-                    active ? "bg-white shadow-soft-1" : ""
-                  }`}
+                  className={`flex-1 items-center rounded-xl px-4 py-3 ${active ? "shadow-soft-1" : ""}`}
+                  style={{ backgroundColor: active ? colors.surface : "transparent" }}
                   onPress={() => {
                     setEntryMode(mode);
                     if (mode === "scan") setScanned(false);
                   }}
                 >
-                  <Text
-                    className={`font-bold ${
-                      active ? "text-[#146EF5]" : "text-[#607089]"
-                    }`}
-                  >
+                  <Text className="font-bold" style={{ color: active ? colors.accent : colors.muted }}>
                     {mode === "manual" ? "Manual entry" : "Scan QR"}
                   </Text>
                 </Pressable>
@@ -137,31 +133,9 @@ export default function CreateOtpScreen(): React.JSX.Element {
           {entryMode === "manual" ? (
             <Surface>
               <VStack className="gap-4">
-                <Field
-                  label="Issuer"
-                  autoCapitalize="words"
-                  editable={!saving}
-                  onChangeText={setIssuer}
-                  placeholder="Example: GitHub"
-                  value={issuer}
-                />
-                <Field
-                  label="Account name"
-                  autoCapitalize="none"
-                  editable={!saving}
-                  onChangeText={setAccountName}
-                  placeholder="you@example.com"
-                  value={accountName}
-                />
-                <Field
-                  label="Secret key"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  editable={!saving}
-                  onChangeText={setSecret}
-                  placeholder="Paste the TOTP secret"
-                  value={secret}
-                />
+                <Field label="Issuer" autoCapitalize="words" editable={!saving} onChangeText={setIssuer} placeholder="Example: GitHub" value={issuer} />
+                <Field label="Account name" autoCapitalize="none" editable={!saving} onChangeText={setAccountName} placeholder="you@example.com" value={accountName} />
+                <Field label="Secret key" autoCapitalize="characters" autoCorrect={false} editable={!saving} onChangeText={setSecret} placeholder="Paste the TOTP secret" value={secret} />
               </VStack>
               <PrimaryButton loading={saving} onPress={() => void saveManualSecret()}>
                 {saving ? "Saving code" : "Save code"}
@@ -169,6 +143,7 @@ export default function CreateOtpScreen(): React.JSX.Element {
             </Surface>
           ) : (
             <OtpScannerPanel
+              colors={colors}
               disabled={saving}
               onScan={(result) => void saveScannedCode(result)}
             />
@@ -180,9 +155,11 @@ export default function CreateOtpScreen(): React.JSX.Element {
 }
 
 function OtpScannerPanel({
+  colors,
   disabled,
   onScan,
 }: {
+  colors: ReturnType<typeof useSafeAuthTheme>["colors"];
   disabled: boolean;
   onScan: (result: BarcodeScanningResult) => void;
 }): React.JSX.Element {
@@ -191,25 +168,26 @@ function OtpScannerPanel({
   if (!cameraModule) {
     return (
       <Surface>
-        <Text selectable className="text-center leading-6 text-[#607089]">
-          Camera scanning is unavailable in this native build. Rebuild the app
-          after installing expo-camera.
+        <Text selectable className="text-center leading-6" style={{ color: colors.muted }}>
+          Camera scanning is unavailable in this native build. Rebuild the app after installing expo-camera.
         </Text>
       </Surface>
     );
   }
 
   return (
-    <LoadedOtpScannerPanel cameraModule={cameraModule} disabled={disabled} onScan={onScan} />
+    <LoadedOtpScannerPanel cameraModule={cameraModule} colors={colors} disabled={disabled} onScan={onScan} />
   );
 }
 
 function LoadedOtpScannerPanel({
   cameraModule,
+  colors,
   disabled,
   onScan,
 }: {
   cameraModule: ExpoCameraModule;
+  colors: ReturnType<typeof useSafeAuthTheme>["colors"];
   disabled: boolean;
   onScan: (result: BarcodeScanningResult) => void;
 }): React.JSX.Element {
@@ -253,23 +231,19 @@ function LoadedOtpScannerPanel({
   return (
     <Surface>
       <VStack className="gap-3">
-        <Text className="text-center leading-6 text-[#607089]">
+        <Text className="text-center leading-6" style={{ color: colors.muted }}>
           Center the authenticator QR code inside the frame.
         </Text>
-        <Box className="h-[320px] overflow-hidden rounded-[24px] bg-[#0B2A57]">
+        <Box className="h-[320px] overflow-hidden rounded-[24px]" style={{ backgroundColor: colors.overlay }}>
           {!permission ? (
             <Box className="flex-1 items-center justify-center">
-              <Spinner color="#FFFFFF" />
+              <Spinner color={colors.white} />
             </Box>
           ) : canScan ? (
-            <CameraView
-              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-              onBarcodeScanned={disabled ? undefined : onScan}
-              style={StyleSheet.absoluteFill}
-            />
+            <CameraView barcodeScannerSettings={{ barcodeTypes: ["qr"] }} onBarcodeScanned={disabled ? undefined : onScan} style={StyleSheet.absoluteFill} />
           ) : (
             <View style={styles.permissionPanel}>
-              <Text className="text-center leading-6 text-white">
+              <Text className="text-center leading-6" style={{ color: colors.white }}>
                 Camera access is required for live scanning.
               </Text>
               <PrimaryButton onPress={() => void requestPermission()}>
@@ -279,11 +253,7 @@ function LoadedOtpScannerPanel({
           )}
         </Box>
       </VStack>
-      <OutlineButton
-        disabled={disabled || selectingImage}
-        loading={selectingImage}
-        onPress={() => void scanImageFromGallery()}
-      >
+      <OutlineButton disabled={disabled || selectingImage} loading={selectingImage} onPress={() => void scanImageFromGallery()}>
         {selectingImage ? "Scanning image" : "Choose QR image"}
       </OutlineButton>
     </Surface>

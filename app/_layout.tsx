@@ -1,5 +1,9 @@
-import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { AppLockScreen } from "@/components/app-lock-screen";
+import {
+  getSafeAuthPalette,
+  SafeAuthThemeProvider,
+} from "@/components/safeauth-theme";
+import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { authClient, subscribeAuthState } from "@/lib/auth-client";
 import {
   getAppLockSettings,
@@ -11,8 +15,9 @@ import {
   type ThemePreference,
 } from "@/lib/app-settings";
 import "@/global.css";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, useColorScheme, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -127,48 +132,71 @@ export default function RootLayout() {
         ? "dark"
         : "light"
       : themePreference;
+  const palette = getSafeAuthPalette(resolvedTheme);
+
+  const navigationTheme = useMemo(() => {
+    const baseTheme = resolvedTheme === "dark" ? DarkTheme : DefaultTheme;
+
+    return {
+      ...baseTheme,
+      colors: {
+        ...baseTheme.colors,
+        background: palette.background,
+        border: palette.border,
+        card: palette.navigation,
+        notification: palette.danger,
+        primary: palette.accent,
+        text: palette.ink,
+      },
+      dark: resolvedTheme === "dark",
+    };
+  }, [palette, resolvedTheme]);
 
   const shouldShowAppLock =
     isLoggedIn && isAppLockEnabled(appLockSettings) && !appUnlocked;
 
   return (
     <SafeAreaProvider>
-      <GluestackUIProvider mode={resolvedTheme}>
-        {loading ? (
-          <View
-            style={{
-              alignItems: "center",
-              backgroundColor: "#F4F7FB",
-              flex: 1,
-              justifyContent: "center",
-            }}
-          >
-            <ActivityIndicator color="#146EF5" />
-          </View>
-        ) : shouldShowAppLock ? (
-          <AppLockScreen
-            settings={appLockSettings}
-            onUnlocked={() => setAppUnlocked(true)}
-          />
-        ) : (
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Protected guard={!isLoggedIn}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="sign-in" />
-              <Stack.Screen name="create-account" />
-            </Stack.Protected>
-            <Stack.Protected guard={isLoggedIn}>
-              <Stack.Screen name="home" />
-              <Stack.Screen name="camera" />
-              <Stack.Screen name="otp" />
-              <Stack.Screen name="otp-create" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="theme-settings" />
-              <Stack.Screen name="security-settings" />
-            </Stack.Protected>
-          </Stack>
-        )}
-      </GluestackUIProvider>
+      <ThemeProvider value={navigationTheme}>
+        <GluestackUIProvider mode={resolvedTheme}>
+          <SafeAuthThemeProvider mode={resolvedTheme}>
+            {loading ? (
+              <View
+                style={{
+                  alignItems: "center",
+                  backgroundColor: palette.background,
+                  flex: 1,
+                  justifyContent: "center",
+                }}
+              >
+                <ActivityIndicator color={palette.accent} />
+              </View>
+            ) : shouldShowAppLock ? (
+              <AppLockScreen
+                settings={appLockSettings}
+                onUnlocked={() => setAppUnlocked(true)}
+              />
+            ) : (
+              <Stack screenOptions={{ contentStyle: { backgroundColor: palette.background }, headerShown: false }}>
+                <Stack.Protected guard={!isLoggedIn}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="sign-in" />
+                  <Stack.Screen name="create-account" />
+                </Stack.Protected>
+                <Stack.Protected guard={isLoggedIn}>
+                  <Stack.Screen name="home" />
+                  <Stack.Screen name="camera" />
+                  <Stack.Screen name="otp" />
+                  <Stack.Screen name="otp-create" />
+                  <Stack.Screen name="settings" />
+                  <Stack.Screen name="theme-settings" />
+                  <Stack.Screen name="security-settings" />
+                </Stack.Protected>
+              </Stack>
+            )}
+          </SafeAuthThemeProvider>
+        </GluestackUIProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

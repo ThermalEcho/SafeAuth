@@ -12,21 +12,22 @@ import { Input, InputField } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
+import { defaultColors, useSafeAuthTheme } from "@/components/safeauth-theme";
 import { router, type Href } from "expo-router";
 import React from "react";
 import type { TextInputProps } from "react-native";
 
-export const colors = {
-  background: "#F4F7FB",
-  blue: "#146EF5",
-  blueDark: "#0B3B82",
-  border: "#DDE5EF",
-  danger: "#C43131",
-  ink: "#10213A",
-  muted: "#607089",
-  paleBlue: "#EAF2FF",
-  white: "#FFFFFF",
-} as const;
+export const colors = defaultColors;
+export { useSafeAuthTheme } from "@/components/safeauth-theme";
+
+export function goBackOrReplace(fallback: Href): void {
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+
+  router.replace(fallback);
+}
 
 export function BrandLogo({
   compact = false,
@@ -35,12 +36,15 @@ export function BrandLogo({
   compact?: boolean;
   showName?: boolean;
 }) {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <HStack className="items-center gap-3">
       <Box
-        className={`overflow-hidden bg-[#0B2A57] ${
+        className={`overflow-hidden ${
           compact ? "h-12 w-12 rounded-2xl" : "h-20 w-20 rounded-[24px]"
         }`}
+        style={{ backgroundColor: colors.iconShell }}
       >
         <Image
           source={require("../assets/images/logo.png")}
@@ -52,10 +56,10 @@ export function BrandLogo({
       </Box>
       {showName ? (
         <VStack className="gap-0">
-          <Heading size={compact ? "xl" : "2xl"} className="text-[#10213A]">
+          <Heading size={compact ? "xl" : "2xl"} style={{ color: colors.ink }}>
             SafeAuth
           </Heading>
-          <Text size="sm" className="font-semibold text-[#607089]">
+          <Text size="sm" className="font-semibold" style={{ color: colors.muted }}>
             Security, simplified.
           </Text>
         </VStack>
@@ -73,27 +77,30 @@ export function PageHeader({
   subtitle?: string;
   backTo?: Href;
 }) {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <VStack className="gap-5">
       <HStack className="items-center justify-between gap-4">
         {backTo ? (
           <Pressable
             accessibilityRole="button"
-            className="rounded-full bg-white px-4 py-2"
-            onPress={() => router.replace(backTo)}
+            className="rounded-full border px-4 py-2"
+            style={{ backgroundColor: colors.surface, borderColor: colors.border }}
+            onPress={() => goBackOrReplace(backTo)}
           >
-            <Text className="font-bold text-[#146EF5]">Back</Text>
+            <Text className="font-bold" style={{ color: colors.accent }}>Back</Text>
           </Pressable>
         ) : (
           <BrandLogo compact />
         )}
       </HStack>
       <VStack className="gap-2">
-        <Heading size="3xl" className="text-[#10213A]">
+        <Heading size="3xl" style={{ color: colors.ink }}>
           {title}
         </Heading>
         {subtitle ? (
-          <Text className="max-w-[520px] text-base leading-6 text-[#607089]">
+          <Text className="max-w-[520px] text-base leading-6" style={{ color: colors.muted }}>
             {subtitle}
           </Text>
         ) : null}
@@ -109,10 +116,13 @@ export function Surface({
   children: React.ReactNode;
   className?: string;
 }) {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <Card
       variant="elevated"
-      className={`gap-5 rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-soft-1 ${className}`}
+      className={`gap-5 rounded-[28px] border p-6 shadow-soft-1 ${className}`}
+      style={{ backgroundColor: colors.surface, borderColor: colors.border }}
     >
       {children}
     </Card>
@@ -123,16 +133,20 @@ export function Field({
   label,
   ...props
 }: TextInputProps & { label: string }) {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <VStack className="gap-2">
-      <Text className="text-sm font-bold text-[#33445E]">{label}</Text>
+      <Text className="text-sm font-bold" style={{ color: colors.ink }}>{label}</Text>
       <Input
         size="xl"
-        className="h-14 rounded-2xl border-[#D5DFEB] bg-[#F9FBFD] data-[focus=true]:border-[#146EF5]"
+        className="h-14 rounded-2xl"
+        style={{ backgroundColor: colors.field, borderColor: colors.fieldBorder }}
       >
         <InputField
-          className="px-4 text-base text-[#10213A] placeholder:text-[#8492A6]"
-          placeholderTextColor="#8492A6"
+          className="px-4 text-base"
+          placeholderTextColor={colors.muted}
+          style={{ color: colors.ink }}
           {...props}
         />
       </Input>
@@ -153,15 +167,20 @@ export function PrimaryButton({
   loading,
   onPress,
 }: AppButtonProps) {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <Button
       size="xl"
       isDisabled={disabled || loading}
       onPress={onPress}
-      className="h-14 rounded-2xl bg-[#146EF5] data-[active=true]:bg-[#0B55C4]"
+      className="h-14 rounded-2xl"
+      style={{ backgroundColor: colors.accent }}
     >
-      {loading ? <ButtonSpinner color="#FFFFFF" /> : null}
-      <ButtonText className="text-base font-bold text-white">{children}</ButtonText>
+      {loading ? <ButtonSpinner color={colors.white} /> : null}
+      <ButtonText className="text-base font-bold" style={{ color: colors.white }}>
+        {children}
+      </ButtonText>
     </Button>
   );
 }
@@ -172,16 +191,21 @@ export function OutlineButton({
   loading,
   onPress,
 }: AppButtonProps) {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <Button
       size="xl"
       variant="outline"
       isDisabled={disabled || loading}
       onPress={onPress}
-      className="h-14 rounded-2xl border-[#B8CAE2] bg-white"
+      className="h-14 rounded-2xl border"
+      style={{ backgroundColor: colors.surface, borderColor: colors.fieldBorder }}
     >
-      {loading ? <ButtonSpinner color={colors.blue} /> : null}
-      <ButtonText className="text-base font-bold text-[#146EF5]">{children}</ButtonText>
+      {loading ? <ButtonSpinner color={colors.accent} /> : null}
+      <ButtonText className="text-base font-bold" style={{ color: colors.accent }}>
+        {children}
+      </ButtonText>
     </Button>
   );
 }
@@ -192,16 +216,21 @@ export function DangerButton({
   loading,
   onPress,
 }: AppButtonProps) {
+  const { colors } = useSafeAuthTheme();
+
   return (
     <Button
       size="xl"
       variant="outline"
       isDisabled={disabled || loading}
       onPress={onPress}
-      className="h-14 rounded-2xl border-[#F0B4B4] bg-[#FFF8F8]"
+      className="h-14 rounded-2xl border"
+      style={{ backgroundColor: colors.dangerSoft, borderColor: colors.dangerBorder }}
     >
-      {loading ? <ButtonSpinner color={colors.danger} /> : null}
-      <ButtonText className="text-base font-bold text-[#C43131]">{children}</ButtonText>
+      {loading ? <ButtonSpinner color={colors.dangerText} /> : null}
+      <ButtonText className="text-base font-bold" style={{ color: colors.dangerText }}>
+        {children}
+      </ButtonText>
     </Button>
   );
 }
