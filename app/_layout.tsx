@@ -219,11 +219,11 @@ export default function RootLayout() {
                   headerShown: false,
                 }}
               >
-                <Stack.Screen name="verify-email" />
                 <Stack.Protected guard={authStatus !== "signed-in"}>
                   <Stack.Screen name="index" />
                   <Stack.Screen name="sign-in" />
                   <Stack.Screen name="create-account" />
+                  <Stack.Screen name="verify-email" />
                 </Stack.Protected>
                 <Stack.Protected guard={isLoggedIn}>
                   <Stack.Screen name="home" />

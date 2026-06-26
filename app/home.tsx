@@ -39,7 +39,6 @@ export default function HomeScreen(): React.JSX.Element {
       }
       setBearerToken(null);
       notifyAuthStateChanged();
-      router.replace("/");
     } catch (error: unknown) {
       showAlert("Logout failed", error instanceof Error ? error.message : "Unknown error.");
     } finally {
