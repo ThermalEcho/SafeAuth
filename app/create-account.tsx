@@ -8,7 +8,7 @@ import {
 import { Pressable } from "@/components/ui/pressable";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
-import { authClient } from "@/lib/auth-client";
+import { authClient, getEmailVerificationCallbackUrl } from "@/lib/auth-client";
 import { showAlert, showAlertWithAction, validateEmail } from "@/lib/auth-utils";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -46,6 +46,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
+        callbackURL: getEmailVerificationCallbackUrl(),
       });
 
       if (response.error) {

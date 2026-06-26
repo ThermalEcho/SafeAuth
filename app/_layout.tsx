@@ -1,4 +1,3 @@
-import { AppLockScreen } from "@/components/app-lock-screen";
 import {
   getSafeAuthPalette,
   SafeAuthThemeProvider,
@@ -17,50 +16,94 @@ import {
 import "@/global.css";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, AppState, useColorScheme, View } from "react-native";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+type AuthStatus = "checking" | "signed-in" | "signed-out";
+type SessionResponse = Awaited<ReturnType<typeof authClient.getSession>>;
+
+const STARTUP_SESSION_TIMEOUT_MS = 2500;
+const LazyAppLockScreen = React.lazy(async () => {
+  const module = await import("@/components/app-lock-screen");
+  return { default: module.AppLockScreen };
+});
+
+function createStartupTimeout(): Promise<"timeout"> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve("timeout"), STARTUP_SESSION_TIMEOUT_MS);
+  });
+}
 
 export default function RootLayout() {
   const systemColorScheme = useColorScheme();
+  const sessionRequestId = useRef(0);
   const [themePreference, setThemePreference] = useState<ThemePreference>("system");
   const [appLockSettings, setAppLockSettings] = useState<AppLockSettings>({
     biometricsEnabled: false,
     pinEnabled: false,
   });
   const [appUnlocked, setAppUnlocked] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
 
   useEffect(() => {
     let mounted = true;
 
-    async function loadSession(): Promise<void> {
+    async function applySessionResponse(
+      response: SessionResponse,
+      requestId: number,
+    ): Promise<void> {
+      if (!mounted || requestId !== sessionRequestId.current) return;
+
+      const hasSession = !response.error && Boolean(response.data?.user);
+
+      if (!hasSession) {
+        setAppUnlocked(true);
+        setAuthStatus("signed-out");
+        return;
+      }
+
+      const lockSettings = await getAppLockSettings();
+      if (!mounted || requestId !== sessionRequestId.current) return;
+
+      setAppLockSettings(lockSettings);
+      setAppUnlocked(!isAppLockEnabled(lockSettings));
+      setAuthStatus("signed-in");
+    }
+
+    async function markSignedOut(requestId: number): Promise<void> {
+      if (!mounted || requestId !== sessionRequestId.current) return;
+      setAppUnlocked(true);
+      setAuthStatus("signed-out");
+    }
+
+    async function loadSession(useStartupTimeout: boolean): Promise<void> {
+      const requestId = sessionRequestId.current + 1;
+      sessionRequestId.current = requestId;
+      const sessionPromise = authClient.getSession();
+
       try {
-        const response = await authClient.getSession();
+        const response = useStartupTimeout
+          ? await Promise.race([sessionPromise, createStartupTimeout()])
+          : await sessionPromise;
 
-        if (mounted) {
-          const hasSession = !response.error && Boolean(response.data?.user);
-          setIsLoggedIn(hasSession);
+        if (response === "timeout") {
+          await markSignedOut(requestId);
+          void sessionPromise
+            .then((lateResponse) => applySessionResponse(lateResponse, requestId))
+            .catch(() => markSignedOut(requestId));
+          return;
+        }
 
-          if (hasSession) {
-            const lockSettings = await getAppLockSettings();
-            setAppLockSettings(lockSettings);
-            setAppUnlocked(!isAppLockEnabled(lockSettings));
-          } else {
-            setAppUnlocked(true);
-          }
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        await applySessionResponse(response, requestId);
+      } catch {
+        await markSignedOut(requestId);
       }
     }
 
-    void loadSession();
+    void loadSession(true);
     const unsubscribe = subscribeAuthState(() => {
-      void loadSession();
+      void loadSession(false);
     });
 
     return () => {
@@ -89,6 +132,8 @@ export default function RootLayout() {
       unsubscribe();
     };
   }, []);
+
+  const isLoggedIn = authStatus === "signed-in";
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -160,25 +205,22 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <GluestackUIProvider mode={resolvedTheme}>
           <SafeAuthThemeProvider mode={resolvedTheme}>
-            {loading ? (
-              <View
-                style={{
-                  alignItems: "center",
-                  backgroundColor: palette.background,
-                  flex: 1,
-                  justifyContent: "center",
+            {shouldShowAppLock ? (
+              <Suspense fallback={null}>
+                <LazyAppLockScreen
+                  settings={appLockSettings}
+                  onUnlocked={() => setAppUnlocked(true)}
+                />
+              </Suspense>
+            ) : (
+              <Stack
+                screenOptions={{
+                  contentStyle: { backgroundColor: palette.background },
+                  headerShown: false,
                 }}
               >
-                <ActivityIndicator color={palette.accent} />
-              </View>
-            ) : shouldShowAppLock ? (
-              <AppLockScreen
-                settings={appLockSettings}
-                onUnlocked={() => setAppUnlocked(true)}
-              />
-            ) : (
-              <Stack screenOptions={{ contentStyle: { backgroundColor: palette.background }, headerShown: false }}>
-                <Stack.Protected guard={!isLoggedIn}>
+                <Stack.Screen name="verify-email" />
+                <Stack.Protected guard={authStatus !== "signed-in"}>
                   <Stack.Screen name="index" />
                   <Stack.Screen name="sign-in" />
                   <Stack.Screen name="create-account" />

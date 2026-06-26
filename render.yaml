@@ -17,6 +17,10 @@ services:
         sync: false
       - key: BETTER_AUTH_URL
         sync: false
+      - key: EXPO_SCHEME
+        value: safeauth
+      - key: BETTER_AUTH_TRUSTED_ORIGINS
+        value: safeauth://
       - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_FROM

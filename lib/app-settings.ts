@@ -1,5 +1,7 @@
-import * as SecureStore from "expo-secure-store";
+import type * as ExpoSecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+
+declare const require: (moduleName: string) => unknown;
 
 export type ThemePreference = "system" | "light" | "dark";
 
@@ -15,20 +17,36 @@ const PIN_KEY = "safeauth.app-lock.pin";
 const fallbackStorage = new Map<string, string>();
 const themeListeners = new Set<() => void>();
 const appLockListeners = new Set<() => void>();
+let secureStoreModule: typeof ExpoSecureStore | null | undefined;
+let secureStoreAvailabilityPromise: Promise<boolean> | null = null;
 
 const defaultAppLockSettings: AppLockSettings = {
   biometricsEnabled: false,
   pinEnabled: false,
 };
 
-async function isNativeSecureStoreAvailable(): Promise<boolean> {
-  if (Platform.OS === "web") return false;
+function getSecureStore(): typeof ExpoSecureStore | null {
+  if (Platform.OS === "web") return null;
+  if (secureStoreModule !== undefined) return secureStoreModule;
 
   try {
-    return await SecureStore.isAvailableAsync();
+    secureStoreModule = require("expo-secure-store") as typeof ExpoSecureStore;
   } catch {
+    secureStoreModule = null;
+  }
+
+  return secureStoreModule;
+}
+
+async function isNativeSecureStoreAvailable(): Promise<boolean> {
+  const SecureStore = getSecureStore();
+  if (!SecureStore) {
+    secureStoreAvailabilityPromise = null;
     return false;
   }
+
+  secureStoreAvailabilityPromise ??= SecureStore.isAvailableAsync().catch(() => false);
+  return secureStoreAvailabilityPromise;
 }
 
 async function readItem(key: string): Promise<string | null> {
@@ -36,7 +54,8 @@ async function readItem(key: string): Promise<string | null> {
     return localStorage.getItem(key);
   }
 
-  if (await isNativeSecureStoreAvailable()) {
+  const SecureStore = (await isNativeSecureStoreAvailable()) ? getSecureStore() : null;
+  if (SecureStore) {
     return SecureStore.getItemAsync(key);
   }
 
@@ -49,7 +68,8 @@ async function writeItem(key: string, value: string): Promise<void> {
     return;
   }
 
-  if (await isNativeSecureStoreAvailable()) {
+  const SecureStore = (await isNativeSecureStoreAvailable()) ? getSecureStore() : null;
+  if (SecureStore) {
     await SecureStore.setItemAsync(key, value);
     return;
   }
@@ -63,7 +83,8 @@ async function deleteItem(key: string): Promise<void> {
     return;
   }
 
-  if (await isNativeSecureStoreAvailable()) {
+  const SecureStore = (await isNativeSecureStoreAvailable()) ? getSecureStore() : null;
+  if (SecureStore) {
     await SecureStore.deleteItemAsync(key);
     return;
   }

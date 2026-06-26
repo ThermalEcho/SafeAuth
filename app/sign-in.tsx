@@ -8,7 +8,12 @@ import {
 import { Pressable } from "@/components/ui/pressable";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
-import { authClient, notifyAuthStateChanged, setBearerToken } from "@/lib/auth-client";
+import {
+  authClient,
+  getEmailVerificationCallbackUrl,
+  notifyAuthStateChanged,
+  setBearerToken,
+} from "@/lib/auth-client";
 import { showAlert, showAlertWithAction } from "@/lib/auth-utils";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -32,6 +37,7 @@ export default function SignInScreen(): React.JSX.Element {
       const response = await authClient.signIn.email({
         email: email.trim().toLowerCase(),
         password,
+        callbackURL: getEmailVerificationCallbackUrl(),
       });
 
       if (response.error) {

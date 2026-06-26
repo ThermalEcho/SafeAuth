@@ -12,6 +12,8 @@ import { pool } from "./db.ts";
 
 const ENV_FILE_PATH = fileURLToPath(String(new URL("../.env", import.meta.url)));
 const DEFAULT_AUTH_BASE_URL = "http://localhost:3000";
+const DEFAULT_APP_SCHEME = "safeauth";
+const TRUSTED_ORIGINS_SEPARATOR = ",";
 const EMAIL_HASH_ROUNDS = 10;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
@@ -71,6 +73,53 @@ function parseEmailSender(value: string | undefined): EmailSender {
     name: match[1].trim(),
     email: match[2].trim(),
   };
+}
+
+/**
+ * Builds the Better Auth trusted origin list for web and native callbacks.
+ */
+function parseTrustedOrigins(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(TRUSTED_ORIGINS_SEPARATOR)
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function getSchemeTrustedOrigin(): string {
+  const scheme = process.env.EXPO_SCHEME?.trim() || DEFAULT_APP_SCHEME;
+
+  return scheme.endsWith("://") ? scheme : `${scheme.replace(/:\/\/$/, "")}://`;
+}
+
+function getTrustedOriginFromUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.origin;
+    }
+
+    return `${url.protocol}//`;
+  } catch {
+    return null;
+  }
+}
+
+function getTrustedOrigins(authBaseUrl: string): string[] {
+  return Array.from(
+    new Set(
+      [
+        getTrustedOriginFromUrl(authBaseUrl),
+        getSchemeTrustedOrigin(),
+        getTrustedOriginFromUrl(process.env.EXPO_PUBLIC_VERIFICATION_CALLBACK_URL),
+        ...parseTrustedOrigins(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
+      ].filter((origin): origin is string => Boolean(origin)),
+    ),
+  );
 }
 
 /**
@@ -142,6 +191,7 @@ function logEmailDeliveryError(error: unknown): void {
 }
 
 const brevoClient = createBrevoClient();
+const authBaseUrl = process.env.BETTER_AUTH_URL ?? DEFAULT_AUTH_BASE_URL;
 
 /**
  * Sends the verification email or logs the fallback URL when email delivery
@@ -189,7 +239,8 @@ async function sendVerificationEmail(context: VerificationEmailContext): Promise
 
 export const auth = betterAuth({
   database: pool,
-  baseURL: process.env.BETTER_AUTH_URL ?? DEFAULT_AUTH_BASE_URL,
+  baseURL: authBaseUrl,
+  trustedOrigins: getTrustedOrigins(authBaseUrl),
   advanced: {
     database: {
       generateId: "serial",

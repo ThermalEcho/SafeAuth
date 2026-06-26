@@ -7,6 +7,7 @@ const LOCAL_API_URLS = new Set([
   "http://10.0.2.2:3000",
 ]);
 const FALLBACK_PRODUCTION_API_URL = "https://safeauth-backend.onrender.com";
+const VERIFICATION_CALLBACK_PATH = "/verify-email";
 let bearerToken = "";
 
 const getConfiguredApiUrl = (): string | undefined => {
@@ -37,6 +38,20 @@ export const getAuthBaseUrl = (): string => {
   }
 
   return FALLBACK_PRODUCTION_API_URL;
+};
+
+export const getEmailVerificationCallbackUrl = (): string => {
+  const configuredUrl = process.env.EXPO_PUBLIC_VERIFICATION_CALLBACK_URL?.trim();
+
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return `${window.location.origin}${VERIFICATION_CALLBACK_PATH}`;
+  }
+
+  return `safeauth://${VERIFICATION_CALLBACK_PATH.replace(/^\//, "")}`;
 };
 
 const authBaseUrl = getAuthBaseUrl();
