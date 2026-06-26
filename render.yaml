@@ -21,6 +21,8 @@ services:
         value: safeauth
       - key: BETTER_AUTH_TRUSTED_ORIGINS
         value: safeauth://
+      - key: EMAIL_VERIFICATION_CALLBACK_URL
+        value: https://safeauth-backend.onrender.com/verify-email
       - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_FROM

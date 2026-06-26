@@ -19,6 +19,8 @@ const DEFAULT_SERVER_HOST = "localhost";
 const HEALTH_CHECK_STATUS = "ok";
 const AUTH_ROUTE_PATTERN = "/api/auth/*";
 const HEALTH_ROUTE = "/health";
+const EMAIL_VERIFICATION_ROUTE = "/verify-email";
+const APP_VERIFICATION_URL = "safeauth://verify-email";
 const INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error";
 const AUTH_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
 const CORS_METHODS = [...AUTH_METHODS, "OPTIONS"] as const;
@@ -126,6 +128,55 @@ function handleAuthRouteError(error: unknown, reply: FastifyReply): FastifyReply
   });
 }
 
+function buildEmailVerificationPage(hasError: boolean): string {
+  const title = hasError ? "Email verification failed" : "Email verified";
+  const heading = hasError ? "This link could not be verified" : "Your email is verified";
+  const message = hasError
+    ? "The verification link is invalid, expired, or has already been used. Request a new link from SafeAuth and try again."
+    : "Your SafeAuth email address has been confirmed. You can now return to the app and sign in.";
+  const statusClass = hasError ? "status error" : "status success";
+  const statusText = hasError ? "!" : "OK";
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>${title} | SafeAuth</title>
+    <style>
+      :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #f4f7f9; color: #17212b; }
+      main { width: min(100%, 520px); }
+      .brand { margin: 0 0 20px; font-size: 20px; font-weight: 800; }
+      .panel { padding: 32px; border: 1px solid #d7e0e7; border-radius: 8px; background: #ffffff; box-shadow: 0 12px 30px rgba(23, 33, 43, 0.08); text-align: center; }
+      .status { width: 64px; height: 64px; margin: 0 auto 20px; display: grid; place-items: center; border-radius: 50%; font-weight: 900; }
+      .success { color: #087a55; background: #e6f6ef; border: 1px solid #a8dfc9; }
+      .error { color: #b42318; background: #fff0ee; border: 1px solid #f2b8b2; }
+      h1 { margin: 0; font-size: 30px; line-height: 1.2; letter-spacing: 0; }
+      p { margin: 14px auto 0; max-width: 420px; color: #53616f; line-height: 1.6; }
+      a { display: inline-flex; min-height: 44px; margin-top: 24px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; background: #087a55; color: #ffffff; font-weight: 700; text-decoration: none; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #10161c; color: #f2f5f7; }
+        .panel { background: #182129; border-color: #33414d; box-shadow: none; }
+        p { color: #b8c3cc; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand">SafeAuth</div>
+      <section class="panel" aria-labelledby="verification-heading">
+        <div class="${statusClass}" aria-hidden="true">${statusText}</div>
+        <h1 id="verification-heading">${heading}</h1>
+        <p>${message}</p>
+        <a href="${APP_VERIFICATION_URL}">Open SafeAuth</a>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
 // -----------------------------------------------------------------------------
 // Fastify application
 // -----------------------------------------------------------------------------
@@ -210,6 +261,22 @@ fastify.get(HEALTH_ROUTE, async (): Promise<{ status: string }> => {
   return { status: HEALTH_CHECK_STATUS };
 });
 
+fastify.get(
+  EMAIL_VERIFICATION_ROUTE,
+  async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+    const query = request.query as { error?: unknown };
+    const hasError = typeof query.error === "string" && query.error.length > 0;
+
+    return reply
+      .header("Cache-Control", "no-store")
+      .header(
+        "Content-Security-Policy",
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+      )
+      .type("text/html; charset=utf-8")
+      .send(buildEmailVerificationPage(hasError));
+  },
+);
 // Root route for Render and browsers
 fastify.get("/", async (): Promise<{ status: string; message: string }> => {
   return { status: HEALTH_CHECK_STATUS, message: "SafeAuth backend running" };

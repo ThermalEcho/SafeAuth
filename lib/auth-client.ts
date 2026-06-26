@@ -47,11 +47,7 @@ export const getEmailVerificationCallbackUrl = (): string => {
     return configuredUrl;
   }
 
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    return `${window.location.origin}${VERIFICATION_CALLBACK_PATH}`;
-  }
-
-  return `safeauth://${VERIFICATION_CALLBACK_PATH.replace(/^\//, "")}`;
+  return `${getAuthBaseUrl().replace(/\/$/, "")}${VERIFICATION_CALLBACK_PATH}`;
 };
 
 const authBaseUrl = getAuthBaseUrl();

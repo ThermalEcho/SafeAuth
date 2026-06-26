@@ -14,6 +14,7 @@ const ENV_FILE_PATH = fileURLToPath(String(new URL("../.env", import.meta.url)))
 const DEFAULT_AUTH_BASE_URL = "http://localhost:3000";
 const DEFAULT_APP_SCHEME = "safeauth";
 const TRUSTED_ORIGINS_SEPARATOR = ",";
+const VERIFICATION_CALLBACK_PATH = "/verify-email";
 const EMAIL_HASH_ROUNDS = 10;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
@@ -109,12 +110,13 @@ function getTrustedOriginFromUrl(value: string | undefined): string | null {
   }
 }
 
-function getTrustedOrigins(authBaseUrl: string): string[] {
+function getTrustedOrigins(authBaseUrl: string, verificationCallbackUrl: string): string[] {
   return Array.from(
     new Set(
       [
         getTrustedOriginFromUrl(authBaseUrl),
         getSchemeTrustedOrigin(),
+        getTrustedOriginFromUrl(verificationCallbackUrl),
         getTrustedOriginFromUrl(process.env.EXPO_PUBLIC_VERIFICATION_CALLBACK_URL),
         ...parseTrustedOrigins(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
       ].filter((origin): origin is string => Boolean(origin)),
@@ -192,6 +194,15 @@ function logEmailDeliveryError(error: unknown): void {
 
 const brevoClient = createBrevoClient();
 const authBaseUrl = process.env.BETTER_AUTH_URL ?? DEFAULT_AUTH_BASE_URL;
+const verificationCallbackUrl =
+  process.env.EMAIL_VERIFICATION_CALLBACK_URL?.trim() ||
+  new URL(VERIFICATION_CALLBACK_PATH, `${authBaseUrl.replace(/\/$/, "")}/`).toString();
+
+function useUniversalVerificationCallback(url: string): string {
+  const verificationUrl = new URL(url);
+  verificationUrl.searchParams.set("callbackURL", verificationCallbackUrl);
+  return verificationUrl.toString();
+}
 
 /**
  * Sends the verification email or logs the fallback URL when email delivery
@@ -202,6 +213,7 @@ const authBaseUrl = process.env.BETTER_AUTH_URL ?? DEFAULT_AUTH_BASE_URL;
 async function sendVerificationEmail(context: VerificationEmailContext): Promise<void> {
   const { user, url } = context;
   const email = user.email;
+  const universalVerificationUrl = useUniversalVerificationCallback(url);
 
   if (!email) {
     console.error("Verification email skipped: user email is missing");
@@ -210,7 +222,7 @@ async function sendVerificationEmail(context: VerificationEmailContext): Promise
 
   try {
     if (brevoClient === null) {
-      logFallbackVerificationUrl(email, url);
+      logFallbackVerificationUrl(email, universalVerificationUrl);
       return;
     }
 
@@ -219,8 +231,8 @@ async function sendVerificationEmail(context: VerificationEmailContext): Promise
       sender,
       to: [{ email }],
       subject: VERIFICATION_EMAIL_SUBJECT,
-      htmlContent: buildVerificationEmailHtml(url),
-      textContent: `Verify your SafeAuth email by opening this link: ${url}`,
+      htmlContent: buildVerificationEmailHtml(universalVerificationUrl),
+      textContent: `Verify your SafeAuth email by opening this link: ${universalVerificationUrl}`,
     });
 
     console.log("Verification email sent:", {
@@ -240,7 +252,7 @@ async function sendVerificationEmail(context: VerificationEmailContext): Promise
 export const auth = betterAuth({
   database: pool,
   baseURL: authBaseUrl,
-  trustedOrigins: getTrustedOrigins(authBaseUrl),
+  trustedOrigins: getTrustedOrigins(authBaseUrl, verificationCallbackUrl),
   advanced: {
     database: {
       generateId: "serial",
